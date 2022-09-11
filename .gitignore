@@ -22,7 +22,7 @@
 *.uvoptx
 *.__i
 *.i
-*.txt
+build/*.txt
 !docs/*.txt
 RTE/
 
