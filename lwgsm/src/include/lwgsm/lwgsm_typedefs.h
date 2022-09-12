@@ -250,6 +250,19 @@ typedef enum {
 
 /**
  * \ingroup         LWGSM_OPERATOR
+ * \brief           Operator net technology
+ */
+typedef enum {
+    LWGSM_USER_SPEC_GSM = 0x00,                 /*!< User-specified GSM access technology */
+    LWGSM_COMPACT_GSM,                          /*!< GSM compact */
+    LWGSM_EGPRS_GSM,                            /*!< GSM EGPRS */
+    LWGSM_USER_SPEC_LTE_M1_A_GB,                /*!< User-specified LTE M1 A GB access technology */
+    LWGSM_USER_SPEC_LTE_NB_S1                   /*!< User-specified LTE NB S1 access technology */
+    
+} lwgsm_operator_netact_t;
+
+/**
+ * \ingroup         LWGSM_OPERATOR
  * \brief           Operator details for scan
  */
 typedef struct {
@@ -257,6 +270,7 @@ typedef struct {
     char long_name[20];                         /*!< Operator long name */
     char short_name[20];                        /*!< Operator short name */
     uint32_t num;                               /*!< Operator numeric value */
+    lwgsm_operator_netact_t netact;             /*!< Operator net technology */
 } lwgsm_operator_t;
 
 /**
@@ -271,6 +285,7 @@ typedef struct {
         char short_name[20];                    /*!< Short name format */
         uint32_t num;                           /*!< Number format */
     } data;                                     /*!< Operator data union */
+    lwgsm_operator_netact_t netact;             /*!< Operator net technology */
 } lwgsm_operator_curr_t;
 
 /**

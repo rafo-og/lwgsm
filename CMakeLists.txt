@@ -40,6 +40,7 @@ set(SRC_FILES   ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/api/${target}_netconn.
                 ${CMAKE_CURRENT_SOURCE_DIR}/snippets/network_utils.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/snippets/client.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/snippets/mqtt_client_api.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/snippets/operator_utils.c
                 # ${CMAKE_CURRENT_SOURCE_DIR}/snippets/call_sms.c
                 # ${CMAKE_CURRENT_SOURCE_DIR}/snippets/call.c
                 # ${CMAKE_CURRENT_SOURCE_DIR}/snippets/sms_send_receive_thread.c

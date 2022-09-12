@@ -450,6 +450,7 @@ lwgsmi_parse_cops(const char* str) {
                 default:
                     break;
             }
+            lwgsm.m.network.curr_operator.netact = (lwgsm_operator_netact_t)lwgsmi_parse_number(&str);
         }
     } else {
         lwgsm.m.network.curr_operator.format = LWGSM_OPERATOR_FORMAT_INVALID;
@@ -475,7 +476,7 @@ lwgsmi_parse_cops_scan(uint8_t ch, uint8_t reset) {
         struct {
             uint8_t bo: 1;                      /*!< Bracket open flag (Bracket Open) */
             uint8_t ccd: 1;                     /*!< 2 consecutive commas detected in a row (Comma Comma Detected) */
-            uint8_t tn: 2;                      /*!< Term number in response, 2 bits for 4 diff values */
+            uint8_t tn: 3;                      /*!< Term number in response, 3 bits for 5 diff values */
             uint8_t tp;                         /*!< Current term character position */
             uint8_t ch_prev;                    /*!< Previous character */
         } f;
@@ -535,6 +536,10 @@ lwgsmi_parse_cops_scan(uint8_t ch, uint8_t reset) {
                 }
                 case 3: {                       /*!< Parse number */
                     lwgsm.msg->msg.cops_scan.ops[i].num = (10 * lwgsm.msg->msg.cops_scan.ops[i].num) + (ch - '0');
+                    break;
+                }
+                case 4: {
+                    lwgsm.msg->msg.cops_scan.ops[i].netact = (lwgsm_operator_netact_t)(10 * (size_t)lwgsm.msg->msg.cops_scan.ops[i].netact + (ch - '0'));
                     break;
                 }
                 default:
