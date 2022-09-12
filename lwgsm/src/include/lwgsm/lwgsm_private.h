@@ -653,6 +653,7 @@ typedef struct {
     size_t              locked_cnt;             /*!< Counter how many times (recursive) stack is currently locked */
 
     lwgsm_sys_sem_t       sem_sync;             /*!< Synchronization semaphore between threads */
+    lwgsm_sys_sem_t       sem_end_sync;         /*!< Synchronization semaphore between threads for end stack */
     lwgsm_sys_mbox_t      mbox_producer;        /*!< Producer message queue handle */
     lwgsm_sys_mbox_t      mbox_process;         /*!< Consumer message queue handle */
     lwgsm_sys_thread_t    thread_produce;       /*!< Producer thread handle */
@@ -673,6 +674,9 @@ typedef struct {
         struct {
             uint8_t     initialized: 1;         /*!< Flag indicating GSM library is initialized */
             uint8_t     dev_present: 1;         /*!< Flag indicating GSM device is present */
+            uint8_t     runningProduce: 1;      /*!< Flag indicating GSM library is running produce thread */
+            uint8_t     runningProcess: 1;      /*!< Flag indicating GSM library is running process thread */
+            uint8_t     runningLLThread: 1;     /*!< Flag indicating GSM library is running Low-Level thread */
         } f;                                    /*!< Flags structure */
     } status;                                   /*!< Status structure */
 } lwgsm_t;

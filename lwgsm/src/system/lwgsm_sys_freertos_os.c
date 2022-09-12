@@ -50,6 +50,12 @@ lwgsm_sys_init(void) {
     return sys_mutex == NULL ? 0 : 1;
 }
 
+uint8_t
+lwgsm_sys_deinit(void) {
+    vSemaphoreDelete(sys_mutex);
+    return 1;
+}
+
 uint32_t
 lwgsm_sys_now(void) {
     return xTaskGetTickCount();

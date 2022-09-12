@@ -61,6 +61,7 @@ typedef void (*lwgsm_sys_thread_fn)(void*);
  */
 
 uint8_t     lwgsm_sys_init(void);
+uint8_t     lwgsm_sys_deinit(void);
 uint32_t    lwgsm_sys_now(void);
 
 uint8_t     lwgsm_sys_protect(void);

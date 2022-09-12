@@ -73,9 +73,13 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
     lwgsmr_t res = lwgsmOK;
 
     lwgsm.status.f.initialized = 0;             /* Clear possible init flag */
+    lwgsm.status.f.runningProduce = 0;          /* Clear possible running flag */
+    lwgsm.status.f.runningProcess = 0;          /* Clear possible running flag */
+    lwgsm.status.f.runningLLThread = 0;         /* Clear possible running flag */
 
     def_evt_link.fn = evt_func != NULL ? evt_func : def_callback;
     lwgsm.evt_func = &def_evt_link;             /* Set callback function */
+
 
     if (!lwgsm_sys_init()) {                    /* Init low-level system */
         goto cleanup;
@@ -83,34 +87,43 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
 
     if (!lwgsm_sys_sem_create(&lwgsm.sem_sync, 1)) {/* Create sync semaphore between threads */
         LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
-                   "[CORE] Cannot allocate sync semaphore!\r\n");
+                   "[CORE] Cannot allocate sync semaphore!");
+        goto cleanup;
+    }
+
+    if (!lwgsm_sys_sem_create(&lwgsm.sem_end_sync, 0)) {/* Create end sync semaphore */
+        LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
+                   "[CORE] Cannot allocate end sync semaphore!");
         goto cleanup;
     }
 
     /* Create message queues */
     if (!lwgsm_sys_mbox_create(&lwgsm.mbox_producer, LWGSM_CFG_THREAD_PRODUCER_MBOX_SIZE)) {
         LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
-                   "[CORE] Cannot allocate producer mbox queue!\r\n");
+                   "[CORE] Cannot allocate producer mbox queue!");
         goto cleanup;
     }
     if (!lwgsm_sys_mbox_create(&lwgsm.mbox_process, LWGSM_CFG_THREAD_PROCESS_MBOX_SIZE)) {
         LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
-                   "[CORE] Cannot allocate process mbox queue!\r\n");
+                   "[CORE] Cannot allocate process mbox queue!");
         goto cleanup;
     }
 
+
     /* Create threads */
+    lwgsm.status.f.runningProduce = 1;                 /* Set running flag before thread creation */
     lwgsm_sys_sem_wait(&lwgsm.sem_sync, 0);
     if (!lwgsm_sys_thread_create(&lwgsm.thread_produce, "lwgsm_produce", lwgsm_thread_produce, &lwgsm.sem_sync, LWGSM_SYS_THREAD_SS, LWGSM_SYS_THREAD_PRIO)) {
         LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
-                   "[CORE] Cannot create producing thread!\r\n");
+                   "[CORE] Cannot create producing thread!");
         lwgsm_sys_sem_release(&lwgsm.sem_sync); /* Release semaphore and return */
         goto cleanup;
     }
     lwgsm_sys_sem_wait(&lwgsm.sem_sync, 0);     /* Wait semaphore, should be unlocked in produce thread */
+    lwgsm.status.f.runningProcess = 1;          /* Set running flag before thread creation */
     if (!lwgsm_sys_thread_create(&lwgsm.thread_process, "lwgsm_process", lwgsm_thread_process, &lwgsm.sem_sync, LWGSM_SYS_THREAD_SS, LWGSM_SYS_THREAD_PRIO)) {
         LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_LVL_SEVERE | LWGSM_DBG_TYPE_TRACE,
-                   "[CORE] Cannot create processing thread!\r\n");
+                   "[CORE] Cannot create processing thread!");
         lwgsm_sys_thread_terminate(&lwgsm.thread_produce);  /* Delete produce thread */
         lwgsm_sys_sem_release(&lwgsm.sem_sync); /* Release semaphore and return */
         goto cleanup;
@@ -120,6 +133,8 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
 
     lwgsm_core_lock();
     lwgsm.ll.uart.baudrate = LWGSM_CFG_AT_PORT_BAUDRATE;
+    lwgsm.status.f.runningLLThread = 1;         /* Set running flag before thread creation */
+
     lwgsm_ll_init(&lwgsm.ll);                   /* Init low-level communication */
 
 #if !LWGSM_CFG_INPUT_USE_PROCESS
@@ -162,6 +177,65 @@ cleanup:
         lwgsm_sys_sem_invalid(&lwgsm.sem_sync);
     }
     return lwgsmERRMEM;
+}
+
+/**
+ * \brief           DiInit GSM stack
+ * \note            Function must be called from operating system thread context.
+ *                  It deletes threads and sempahore logic created.
+ *
+ * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t enumeration otherwise
+ */
+lwgsmr_t
+lwgsm_deinit(void){
+    lwgsmr_t res = lwgsmOK;
+    
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Deinitializing LWGSM library");
+
+    /* Terminate threads */
+    lwgsm.status.f.runningLLThread = 0;          /* Clear produce thread running flag */
+    lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
+    lwgsm_ll_deinit(&lwgsm.ll);
+
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Low-Level thread terminated");
+    lwgsm.status.f.runningProduce = 0;          /* Clear produce thread running flag */
+    lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Produce thread terminated");
+    lwgsm.status.f.runningProcess = 0;          /* Clear produce thread running flag */
+    lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Process thread terminated");
+
+    /* Remove all queues and semaphores */
+    lwgsm_sys_mbox_delete(&lwgsm.mbox_producer);
+    lwgsm_sys_mbox_invalid(&lwgsm.mbox_producer);
+
+    lwgsm_sys_mbox_delete(&lwgsm.mbox_process);
+    lwgsm_sys_mbox_invalid(&lwgsm.mbox_process);
+
+    lwgsm_sys_sem_delete(&lwgsm.sem_sync);
+    lwgsm_sys_sem_invalid(&lwgsm.sem_sync);
+
+    lwgsm_sys_sem_delete(&lwgsm.sem_end_sync);
+    lwgsm_sys_sem_invalid(&lwgsm.sem_end_sync);
+
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Core logic terminated");
+
+    lwgsm_sys_deinit();                         /* DeInit low-level system */
+
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[CORE] Library terminated.");
+
+    lwgsm.status.f.initialized = 0;             /* Clear possible init flag */
+
+    def_evt_link.fn = NULL;
+    lwgsm.evt_func = NULL;                      /* Clear callback function */
+
+    return res;
 }
 
 /**

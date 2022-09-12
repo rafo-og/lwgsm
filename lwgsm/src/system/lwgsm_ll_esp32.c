@@ -39,6 +39,7 @@
 #include "lwgsm/lwgsm.h"
 #include "lwgsm/lwgsm_mem.h"
 #include "lwgsm/lwgsm_input.h"
+#include "lwgsm/lwgsm_private.h"
 
 #include "lwgsm_opts.h"
 #include "driver/uart.h"
@@ -96,6 +97,9 @@
 
 #define LWGSM_READING_THREAD_STACK_SIZE         4096
 
+#if !LWGSM_CFG_MEM_CUSTOM
+static uint8_t memory[0x10000];             /* Create memory for dynamic allocations with specific size */
+#endif
 static uint8_t is_running, initialized;
 static const char *TAG = "LWGSM_UART";
 
@@ -117,17 +121,17 @@ static uint8_t reset_device(uint8_t state);
 static void usart_ll_thread(void* arg)
 {
     uart_event_t event;
+    uart_event_t* eventPtr = &event;
     uint8_t* dtmp = (uint8_t*) malloc(LWGSM_UART_RX_BUF_SIZE);
-    QueueHandle_t uart_queue = uart_event_ll_mbox_id;
 
     // To avoid non-used warning
     (void)(arg);
 
-    ESP_LOGD(TAG, "Reading thread initialized.");
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "[UART THREAD] Thread started");
 
-    while(1){
+    while(lwgsm.status.f.runningLLThread){
         //Waiting for UART event.
-        if(xQueueReceive(uart_queue, (void * )&event, (portTickType)portMAX_DELAY)){
+        if(lwgsm_sys_mbox_get(&uart_event_ll_mbox_id, (void **)&eventPtr, 5000/portTICK_PERIOD_MS) != LWGSM_SYS_TIMEOUT){
             bzero(dtmp, LWGSM_UART_RX_BUF_SIZE);
             switch(event.type) {
                 //Event of UART receving data
@@ -149,10 +153,15 @@ static void usart_ll_thread(void* arg)
                     break;
             }
         }
+        bzero(&event, sizeof(event));
     }
+    
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "[UART THREAD] Thread exit");
     free(dtmp);
     dtmp = NULL;
-    vTaskDelete(NULL);
+    lwgsm_sys_sem_release(&lwgsm.sem_end_sync);
+    usart_ll_thread_id = NULL;
+    lwgsm_sys_thread_terminate(&usart_ll_thread_id);
 }
 
 /**
@@ -181,7 +190,8 @@ static void configure_uart(uint32_t baudrate)
         CHECK_OS_STATUS(osStatus, __func__);
     }
 
-    ESP_LOGD(TAG, "Initializing UART to baudrate %d", baudrate);
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+        "[UART INIT] Initializing UART to baudrate %d", baudrate);
 
     if (!initialized) {
         // Install UART driver
@@ -198,9 +208,6 @@ static void configure_uart(uint32_t baudrate)
         //Set UART pins (using UART0 default pins ie no changes.)
         ret = uart_set_pin(LWGSM_UART_NUM, LWGSM_UART_TX, LWGSM_UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
         ESP_ERROR_CHECK(ret);
-
-        //Reset the pattern queue length to record at most LWGSM_UART_QUEUE_SIZE pattern positions.
-        uart_pattern_queue_reset(LWGSM_UART_NUM, LWGSM_UART_QUEUE_SIZE);
 
         is_running = 1;
     } else{
@@ -263,8 +270,6 @@ lwgsmr_t lwgsm_ll_init(lwgsm_ll_t* ll)
 {
 #if !LWGSM_CFG_MEM_CUSTOM
     /* Step 1: Configure memory for dynamic allocations */
-    static uint8_t memory[0x10000];             /* Create memory for dynamic allocations with specific size */
-
     /*
      * Create region(s) of memory.
      * If device has internal/external memory available,
@@ -315,17 +320,29 @@ lwgsmr_t lwgsm_ll_deinit(lwgsm_ll_t* ll)
 {
     esp_err_t ret;
 
-    LWGSM_UNUSED(ll);
-
-    if (uart_event_ll_mbox_id != NULL) {
-        lwgsm_sys_mbox_t* tmp = &uart_event_ll_mbox_id;
-        uart_event_ll_mbox_id = NULL;
-        lwgsm_sys_mbox_delete(tmp);
+#if !LWGSM_CFG_MEM_CUSTOM
+    if (initialized) {
+        lwgsm_mem_free_s((void**) &memory);
     }
-    if (usart_ll_thread_id != NULL) {
-        lwgsm_sys_thread_t* tmp = &usart_ll_thread_id;
-        usart_ll_thread_id = NULL;
-        lwgsm_sys_thread_terminate(tmp);
+#endif /* !LWGSM_CFG_MEM_CUSTOM */
+
+    if (!initialized) {
+        ll->send_fn = NULL;
+        #if defined(LWGSM_RESET_PIN)
+        ll->reset_fn = NULL;
+        #endif /* defined(LWGSM_RESET_PIN) */
+    }
+
+#if defined(LWGSM_RESET_PIN)
+    gpio_reset_pin((gpio_num_t) LWGSM_RESET_PIN);
+#endif
+    if (uart_event_ll_mbox_id != NULL) {
+        uart_event_t event;
+        uart_event_t* eventPtr = &event;
+        /* Empty queue if there are messages */
+        while(lwgsm_sys_mbox_get(&uart_event_ll_mbox_id, (void **)&eventPtr, 10/portTICK_PERIOD_MS) != LWGSM_SYS_TIMEOUT);
+        lwgsm_sys_mbox_delete(&uart_event_ll_mbox_id);
+        uart_event_ll_mbox_id = NULL;
     }
     if(uart_is_driver_installed(LWGSM_UART_NUM)){
         ret = uart_driver_delete(LWGSM_UART_NUM);
@@ -335,7 +352,6 @@ lwgsmr_t lwgsm_ll_deinit(lwgsm_ll_t* ll)
     
     return lwgsmOK;
 }
-
 
 #if defined(LWGSM_RESET_PIN)
 /**
