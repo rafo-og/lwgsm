@@ -199,8 +199,14 @@ lwgsm_conn_start(lwgsm_conn_p* conn, lwgsm_conn_type_t type, const char* const h
     LWGSM_ASSERT("conn_evt_fn != NULL", conn_evt_fn != NULL);
 
     LWGSM_MSG_VAR_ALLOC(msg, blocking);
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CIPSTART;
     LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CIPSTATUS;
+#else
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CONN_START;
+    LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CDNSCFG;
+#endif
+
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.num = LWGSM_CFG_MAX_CONNS;/* Set maximal value as invalid number */
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.conn = conn;
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.type = type;

@@ -770,6 +770,13 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
         } else if (CMD_IS_CUR(LWGSM_CMD_CPBF) && !strncmp(rcv->data, "+CPBF", 5)) {
             lwgsmi_parse_cpbf(rcv->data);       /* Parse +CPBR statement */
 #endif /* LWGSM_CFG_PHONEBOOK */
+
+#if LWGSM_SIM7080
+        } else if(CMD_IS_CUR(LWGSM_CMD_CGATT_GET) && !strncmp(rcv->data, "+CGATT", 6)){
+            lwgsmi_parse_cgatt(rcv->data);                  /* Parse +CGATT statement */
+        } else if(CMD_IS_CUR(LWGSM_CMD_CGNAPN) && !strncmp(rcv->data, "+CGNAPN", 7)){
+            lwgsmi_parse_cgnapn(rcv->data, rcv->len);        /* Parse +CGNAPN statement */
+#endif
         }
 
         /* Messages not starting with '+' sign */
@@ -954,6 +961,16 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
                 is_ok = 1;
             }
 #endif /* LWGSM_CFG_USSD */
+#if LWGSM_SIM7080
+        } else if(CMD_IS_CUR(LWGSM_CMD_CDNSGIP)){
+            if (is_ok) {
+                is_ok = 0;
+            }
+            if(!strncmp(rcv->data, "+CDNSGIP", 8)){
+                lwgsmi_parse_cdnsgip(rcv->data, rcv->len, &is_ok, &is_error,
+                        &((*(lwgsm_conn_t*)lwgsm.msg->msg.conn_start.arg).remote_ip));       /* Parse +CDNSGIP statement */
+            }
+#endif
         }
     }
 
@@ -1376,12 +1393,17 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 break;
             }
             case LWGSM_CMD_CREG_SET:
+#if !LWGSM_SIM7080
                 SET_NEW_CMD(LWGSM_CMD_CLCC_SET);
                 break;                          /* Set call state */
             case LWGSM_CMD_CLCC_SET:
+#endif
                 SET_NEW_CMD(LWGSM_CMD_CPIN_GET);
                 break;                          /* Get SIM state */
             case LWGSM_CMD_CPIN_GET:
+                SET_NEW_CMD(LWGSM_CMD_CMNB_SET);
+                break;                          /* Set preferred option between NB-IoT and CAT-M */
+            case LWGSM_CMD_CMNB_SET:
                 break;
             default:
                 break;
@@ -1553,6 +1575,7 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
     }
     if (CMD_IS_DEF(LWGSM_CMD_NETWORK_ATTACH)) {
         switch (msg->i) {
+#if !LWGSM_SIM7080
             case 0:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CGACT_SET_0);
                 break;
@@ -1592,6 +1615,22 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
             case 10:
                 SET_NEW_CMD(LWGSM_CMD_CIPSTATUS);
                 break;
+#else
+            case 0:
+                if(*is_ok && lwgsm.m.network.is_attached){
+                    SET_NEW_CMD(LWGSM_CMD_CGNAPN);
+                }else if(*is_ok){
+                    *is_ok = 0;
+                    *is_error = 1;
+                }
+                break;
+            case 1:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CNCFG);
+                break;
+            case 2:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CNACT_SET_1);
+                break;
+#endif
             default:
                 break;
         }
@@ -1682,6 +1721,26 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
         }
         /* The rest is handled in one layer above */
 #endif /* LWGSM_CFG_USSD */
+#if LWGSM_SIM7080
+    }else if(CMD_IS_DEF(LWGSM_CMD_DEFINE_PDP)) {
+        switch (msg->i) {
+            case 0:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CGDCONT);
+            break;
+            case 1:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CGACT_SET_1);
+            break;
+            default:
+                break;
+        }
+    }else if(CMD_IS_DEF(LWGSM_CMD_CONN_START)) {
+        switch (msg->i) {
+            case 0:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CDNSGIP);
+            default:
+                break;
+        }
+#endif
     }
 
     /* Check if new command was set for execution */
@@ -2176,13 +2235,27 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         case LWGSM_CMD_NETWORK_ATTACH:
         case LWGSM_CMD_CGACT_SET_0: {
             AT_PORT_SEND_BEGIN_AT();
+#if !LWGSM_SIM7080
             AT_PORT_SEND_CONST_STR("+CGACT=0");
+#else
+            AT_PORT_SEND_CONST_STR("+CGACT=0");
+            if(CMD_IS_DEF(LWGSM_CMD_DEFINE_PDP)){
+                lwgsmi_send_number(LWGSM_MSG_VAR_REF(msg).msg.pdp_context.idx, 0, 1);
+            }
+#endif
             AT_PORT_SEND_END_AT();
             break;
         }
         case LWGSM_CMD_CGACT_SET_1: {
             AT_PORT_SEND_BEGIN_AT();
+#if !LWGSM_SIM7080
             AT_PORT_SEND_CONST_STR("+CGACT=1");
+#else
+            AT_PORT_SEND_CONST_STR("+CGACT=1");
+            if(CMD_IS_DEF(LWGSM_CMD_DEFINE_PDP)){
+                lwgsmi_send_number(LWGSM_MSG_VAR_REF(msg).msg.pdp_context.idx, 0, 1);
+            }
+#endif
             AT_PORT_SEND_END_AT();
             break;
         }
@@ -2248,6 +2321,91 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             break;
         }
 #endif /* LWGSM_CFG_USSD */
+#if LWGSM_SIM7080
+        case LWGSM_CMD_CGATT_GET:{              /* Check PS service. 1 indicates PS has attached. */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CGATT?");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CGNAPN:{                 /* Get APN network name */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CGNAPN");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CNCFG:{                  /* PDP configure */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CNCFG=");
+            AT_PORT_SEND_CONST_STR("0,1,");
+            AT_PORT_SEND_QUOTE_COND(1);
+            if(msg->msg.network_attach.apn != NULL){
+                AT_PORT_SEND_STR(msg->msg.network_attach.apn);
+            }
+            AT_PORT_SEND_QUOTE_COND(1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CNACT_SET_0:{            /* APP Network Deactive */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CNACT=");
+            AT_PORT_SEND_CONST_STR("0,0");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CNACT_SET_1:{            /* APP Network Active */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CNACT=");
+            AT_PORT_SEND_CONST_STR("0,1");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CMNB_SET:{               /* Set preferred network type */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CMNB=");
+#if LWGSM_PREFERRED_NETWORK_TYPE == LWGSM_NET_TYPE_CAT_M
+            AT_PORT_SEND_CHR("1");
+#elif LWGSM_PREFERRED_NETWORK_TYPE == LWGSM_NET_TYPE_NB_IOT
+            AT_PORT_SEND_CHR("2");
+#else
+            AT_PORT_SEND_CONST_STR("3");
+#endif
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CGDCONT:{                /* Define PDP Context */
+            AT_PORT_SEND_BEGIN_AT();            
+            AT_PORT_SEND_CONST_STR("+CGDCONT=");
+            lwgsmi_send_number(msg->msg.pdp_context.idx, 0, 0);
+            lwgsmi_send_string(msg->msg.pdp_context.pdp_type, 0, 1, 1);
+            lwgsmi_send_string(msg->msg.pdp_context.apn, 0, 1, 1);
+            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.d_comp, 0, msg->msg.pdp_context.d_comp
+                                    || msg->msg.pdp_context.h_comp || msg->msg.pdp_context.ipv4_ctrl);
+            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.h_comp, 0, msg->msg.pdp_context.h_comp
+                                    || msg->msg.pdp_context.ipv4_ctrl);
+            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.ipv4_ctrl ? 1 : 0, 0, msg->msg.pdp_context.ipv4_ctrl ? 1 : 0);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CDNSCFG:{                /* Set DNS Server IP Address */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CDNSCFG=");
+            AT_PORT_SEND_CONST_STR(LWGSM_PRIMARY_DNS_SERVER);
+            AT_PORT_SEND_COMMA_COND(1);
+            AT_PORT_SEND_CONST_STR(LWGSM_SECONDARY_DNS_SERVER);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CDNSGIP:{                /* Resolve the Domain Name */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CDNSGIP=");
+            lwgsmi_send_string(msg->msg.conn_start.host, 0, 1, 0);
+            lwgsmi_send_number(5, 0, 1);
+            lwgsmi_send_number(10000, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+#endif
         default:
             return lwgsmERR;                    /* Invalid command */
     }

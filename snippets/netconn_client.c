@@ -35,6 +35,7 @@ netconn_client_thread(void const* arg) {
     while (lwgsm_network_request_attach() != lwgsmOK) {
         lwgsm_delay(1000);
     }
+    LWGSM_DEBUGF(0xFF, "Network attached.\r\n");
 
     /*
      * First create a new instance of netconn

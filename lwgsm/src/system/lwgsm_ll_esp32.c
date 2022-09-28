@@ -48,7 +48,7 @@
 #include "esp_log.h"
 
 #if !defined(LWGSM_UART_NUM)
-#define LWGSM_UART_NUM              UART_NUM_0
+#define LWGSM_UART_NUM              UART_NUM_1
 #endif /* !defined(LWGSM_UART_NUM) */
 
 #if !defined(LWGSM_UART_RX_BUF_SIZE)
@@ -79,21 +79,8 @@
 #define LWGSM_RESET_PIN_MASK_BIT    (1ULL << LWGSM_RESET_PIN)
 #endif
 
-#define CHECK_OS_STATUS(x, func)    do{ \
-                                        if(x != pdPASS){ \
-                                            ESP_LOGE(TAG, "File [%s] . Line: %d || Error (0x%x) from [%s]", __FILE__, __LINE__, x, func);\
-                                        }\
-                                        while(0); \
-                                    }while(0)
-
-#define CHECK_TIMEOUT(x, func)      do{ \
-                                        if(x == LWGSM_SYS_TIMEOUT){ \
-                                            ESP_LOGW(TAG, "File [%s] || Line: %d || TIMEOUT from [%s]", __FILE__, __LINE__, func);\
-                                        }\
-                                        while(0); \
-                                    }while(0)
-
-#define TASK_PRIORITY_MEDIUM        configMAX_PRIORITIES/2
+#define USART_THREAD_PRIORITY       configMAX_PRIORITIES/2
+#define USART_QUEUE_TIMEOUT         (portTickType) 5000/portTICK_PERIOD_MS
 
 #define LWGSM_READING_THREAD_STACK_SIZE         4096
 
@@ -105,10 +92,10 @@ static const char *TAG = "LWGSM_UART";
 
 /* USART thread */
 static void usart_ll_thread(void* arg);
-static lwgsm_sys_thread_t usart_ll_thread_id;
+static TaskHandle_t usart_ll_thread_id;
 
 /* Events queue */
-static lwgsm_sys_mbox_t uart_event_ll_mbox_id;
+static QueueHandle_t uart_event_ll_mbox_id;
 
 /* Hardware reset function */
 #if defined(LWGSM_RESET_PIN)
@@ -131,7 +118,7 @@ static void usart_ll_thread(void* arg)
 
     while(lwgsm.status.f.runningLLThread){
         //Waiting for UART event.
-        if(lwgsm_sys_mbox_get(&uart_event_ll_mbox_id, (void **)&eventPtr, 5000/portTICK_PERIOD_MS) != LWGSM_SYS_TIMEOUT){
+        if(xQueueReceive(uart_event_ll_mbox_id, (void *) eventPtr, USART_QUEUE_TIMEOUT) == pdPASS){
             bzero(dtmp, LWGSM_UART_RX_BUF_SIZE);
             switch(event.type) {
                 //Event of UART receving data
@@ -152,8 +139,8 @@ static void usart_ll_thread(void* arg)
                     ESP_LOGW(TAG, "uart event not captured type: %d", event.type);
                     break;
             }
+            bzero(&event, sizeof(event));
         }
-        bzero(&event, sizeof(event));
     }
     
     LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "[UART THREAD] Thread exit");
@@ -181,14 +168,7 @@ static void configure_uart(uint32_t baudrate)
     };
     uint32_t currentBaudRate = 0;
     esp_err_t ret;
-    uint32_t osStatus;
     QueueHandle_t* queue = &uart_event_ll_mbox_id;
-
-    /* Create mbox and start thread */
-    if (uart_event_ll_mbox_id == NULL) {
-        osStatus = lwgsm_sys_mbox_create(&uart_event_ll_mbox_id, LWGSM_UART_QUEUE_SIZE);
-        CHECK_OS_STATUS(osStatus, __func__);
-    }
 
     LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
         "[UART INIT] Initializing UART to baudrate %d", baudrate);
@@ -221,8 +201,8 @@ static void configure_uart(uint32_t baudrate)
 
     // Create thread to read the incoming data from UART
     if (usart_ll_thread_id == NULL) {
-        osStatus = lwgsm_sys_thread_create(&usart_ll_thread_id, "LwGSM UART reading thread", usart_ll_thread, &uart_event_ll_mbox_id, LWGSM_READING_THREAD_STACK_SIZE, TASK_PRIORITY_MEDIUM);
-        CHECK_OS_STATUS(osStatus, __func__);
+        xTaskCreate(usart_ll_thread, "LwGSM UART reading thread", LWGSM_READING_THREAD_STACK_SIZE, NULL, USART_THREAD_PRIORITY, &usart_ll_thread_id);
+        configASSERT(usart_ll_thread_id != NULL);
     }
 }
 

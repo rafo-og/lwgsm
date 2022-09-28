@@ -50,29 +50,6 @@ TEST_CASE("Operator scan parser (AT+COPS=?)", "[lwgsm_parser]")
         vPortFree(ops_array);
 }
 
-TEST_CASE("Initializing -> deinitializing loop (memory leak)", "[lwgsm_sys]"){
-        int times = 2;
-        lwgsmr_t ret;
-
-        while(times--){
-                printf("Initializing LWGSM... \n");
-                ret = lwgsm_init(lwgsm_callback_func, 1);
-                if (ret != lwgsmOK) {
-                        printf("Cannot initialize LwGSM\r\n");
-                }
-
-                lwgsm_delay(500/portTICK_PERIOD_MS);
-
-                printf("DeInitializing LWGSM... \n");
-                ret = lwgsm_deinit();
-                if (ret != lwgsmOK) {
-                        printf("Cannot deinitialize LwGSM\r\n");
-                }
-
-                lwgsm_delay(500/portTICK_PERIOD_MS);
-        }
-}
-
 /**
  * \brief           Event callback function for GSM stack
  * \param[in]       evt: Event information with data

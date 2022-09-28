@@ -643,6 +643,37 @@ typedef struct {
  */
 typedef void (*lwgsm_api_cmd_evt_fn)(lwgsmr_t res, void* arg);
 
+#if LWGSM_SIM7080
+/**
+ * \brief   APN type for +CGDCONT command 
+ */
+typedef enum lwgsm_apn_pdp_type {
+    APN_PDP_IP,
+    APN_PDP_PPP,
+    APN_PDP_IPV6,
+    APN_PDP_IPV4V6,
+    APN_PDP_NON_IP
+} lwgsm_apn_pdp_type_t;
+/**
+ * \brief   A numeric parameter that controls PDP data compression for +CGDCONT command 
+ */
+typedef enum lwgsm_apn_d_comp {
+    APN_D_COMP_OFF,
+    APN_D_COMP_ON,
+    APN_D_COMP_V42BIS
+} lwgsm_apn_d_comp_t;
+/**
+ * \brief   A numeric parameter that controls PDP head compression for +CGDCONT command 
+ */
+typedef enum lwgsm_apn_h_comp {
+    APN_H_COMP_OFF,
+    APN_H_COMP_ON,
+    APN_H_COMP_RFC1144,
+    APN_H_COMP_RFC2507,
+    APN_H_COMP_RFC3095
+} lwgsm_apn_h_comp_t;
+#endif
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -130,4 +130,22 @@ lwgsm_network_request_detach(void) {
     return res;
 }
 
+/**
+ * \brief           Set system network APN settings before asking for attach
+ * \param[in]       idx: APN index. Should be between 1 and 15. If set to `NULL` the index is zero
+ * \param[in]       pdp_type: PDP type. If set to `NULL`, PDP type is IP 
+ * \param[in]       apn: APN domain. Set to `NULL` if not used
+ * \param[in]       pdp_addr: A string parameter that identifies the MT in the address space applicable to the PDP.
+ *                              If `NULL` the address is "0.0.0.0"
+ * \param[in]       d_comp: A numeric parameter that controls PDP data compression. If set to `NULL` compression is OFF
+ * \param[in]       h_comp: A numeric parameter that controls PDP head compression. If set to `NULL` compression is OFF
+ * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t otherwise
+ */
+lwgsmr_t
+lwgsm_network_request_define_pdp_context(const int idx, const lwgsm_apn_pdp_type_t pdp_type, const char* apn, const char* pdp_addr, const lwgsm_apn_d_comp_t d_comp, const lwgsm_apn_h_comp_t h_comp, const bool ipv4_ctrl, const bool blocking) {
+
+    return lwgsm_network_define_pdp_context(idx, pdp_type, apn, pdp_addr, d_comp, h_comp, ipv4_ctrl, NULL, NULL, (uint32_t) blocking);
+
+}
+
 #endif /* LWGSM_CFG_NETWORK || __DOXYGEN__ */

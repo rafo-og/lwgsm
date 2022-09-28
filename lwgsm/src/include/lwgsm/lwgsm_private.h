@@ -251,6 +251,20 @@ typedef enum {
     LWGSM_CMD_CSMP,                             /*!< Set SMS Text Mode Parameters */
     LWGSM_CMD_CSMS,                             /*!< Select Message Service */
 
+#if LWGSM_SIM7080
+    /* SIM7080 additional AT commands*/
+    LWGSM_CMD_CGATT_GET,                        /*!< Check PS Service */
+    LWGSM_CMD_CGNAPN,                           /*!< Get APN */
+    LWGSM_CMD_CNCFG,                            /*!< PDP configure */
+    LWGSM_CMD_CNACT_SET_0,                      /*!< PDP configure */
+    LWGSM_CMD_CNACT_SET_1,                      /*!< PDP configure */
+    LWGSM_CMD_CMNB_SET,                         /*!< Set preferred network type */
+    LWGSM_CMD_CGDCONT,                          /*!< Define PDP Context */
+    /* AT COMMANDS SEQUENCE */
+    LWGSM_CMD_DEFINE_PDP,                       /*!< Define new PDP context */
+    LWGSM_CMD_CONN_START,                       /*!< Start new connection to server */
+#endif
+
     LWGSM_CMD_END,                              /*!< Last CMD entry */
 } lwgsm_cmd_t;
 
@@ -515,6 +529,21 @@ typedef struct lwgsm_msg {
             const char* pass;                   /*!< APN password */
         } network_attach;                       /*!< Settings for network attach */
 #endif /* LWGSM_CFG_NETWORK || __DOXYGEN__ */
+#if LWGSM_SIM7080
+        struct{
+            uint8_t idx;
+            const char* pdp_type;
+            const char* apn;
+            lwgsm_ip_t* pdp_addr;
+            lwgsm_apn_d_comp_t d_comp;
+            lwgsm_apn_h_comp_t h_comp;
+            uint8_t ipv4_ctrl;
+        } pdp_context;
+        struct{
+            const char* ca_root;
+            const char* client_cert;
+        } certs_write;
+#endif
     } msg;                                      /*!< Group of different possible message contents */
 } lwgsm_msg_t;
 

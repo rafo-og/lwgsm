@@ -1,17 +1,16 @@
 #include "sim_manager.h"
-#include "lwgsm/lwgsm.h"
 
 /**
  * \brief           SIM card pin code
  */
 static const char*
-pin_code = "7958";
+pin_code = "5873";
 
 /**
  * \brief           SIM card puk code
  */
 static const char*
-puk_code = "10663647";
+puk_code = "12926752";
 
 /**
  * \brief           Configure and enable SIM card
@@ -26,5 +25,46 @@ configure_sim_card(void) {
         }
         return 0;
     }
+    return 1;
+}
+
+/**
+ * \brief   Print SIM state
+ * \param[in]   evt: The event received from stack
+ * \return          `1` on success, `0` otherwise
+ */
+uint8_t
+process_sim_evt(lwgsm_evt_t* evt){
+    if(evt->type != LWGSM_EVT_SIM_STATE_CHANGED){
+        return 0;
+    }
+
+    switch(evt->evt.cpin.state){
+        case LWGSM_SIM_STATE_NOT_INSERTED:
+            printf("SIM state: LWGSM_SIM_STATE_NOT_INSERTED.\r\n");
+        break;
+        case LWGSM_SIM_STATE_READY:
+            printf("SIM state: LWGSM_SIM_STATE_READY.\r\n");
+        break;
+        case LWGSM_SIM_STATE_NOT_READY:
+            printf("SIM state: LWGSM_SIM_STATE_NOT_READY.\r\n");
+        break;
+        case LWGSM_SIM_STATE_PIN:
+            printf("SIM state: LWGSM_SIM_STATE_PIN.\r\n");
+        break;
+        case LWGSM_SIM_STATE_PUK:
+            printf("SIM state: LWGSM_SIM_STATE_PUK.\r\n");
+        break;
+        case LWGSM_SIM_STATE_PH_PIN:
+            printf("SIM state: LWGSM_SIM_STATE_PH_PIN.\r\n");
+        break;
+        case LWGSM_SIM_STATE_PH_PUK:
+            printf("SIM state: LWGSM_SIM_STATE_PH_PUK.\r\n");
+        break;
+        default:
+            printf("SIM state: UNKNOWN.\r\n");
+        break;
+    }
+
     return 1;
 }

@@ -661,6 +661,24 @@ void *  my_memset(void* dst, int b, size_t len);
  * \}
  */
 
+#ifdef  LWGSM_SIM7080
+
+/**
+ * \brief       Network types to set preferred network
+*/
+#ifndef LWGSM_NET_TYPE_CAT_M
+#define LWGSM_NET_TYPE_CAT_M    1
+#endif
+#ifndef LWGSM_NET_TYPE_NB_IOT
+#define LWGSM_NET_TYPE_NB_IOT    2
+#endif
+#ifndef LWGSM_NET_TYPE_BOTH
+#define LWGSM_NET_TYPE_BOTH    3
+#endif
+
+#endif
+
+
 #if !__DOXYGEN__
 
 #if !LWGSM_CFG_OS

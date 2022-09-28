@@ -34,6 +34,9 @@
 #include "lwgsm/lwgsm_private.h"
 #include "lwgsm/lwgsm_network.h"
 #include "lwgsm/lwgsm_mem.h"
+#if LWGSM_SIM7080
+#include "lwgsm/lwgsm_parser.h"
+#endif
 
 #if LWGSM_CFG_NETWORK || __DOXYGEN__
 
@@ -56,11 +59,21 @@ lwgsm_network_attach(const char* apn, const char* user, const char* pass,
     LWGSM_MSG_VAR_SET_EVT(msg, evt_fn, evt_arg);
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_NETWORK_ATTACH;
 #if LWGSM_CFG_CONN
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CIPSTATUS;
+#else
+    LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CGATT_GET;
+#endif
 #endif /* LWGSM_CFG_CONN */
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).msg.network_attach.apn = apn;
     LWGSM_MSG_VAR_REF(msg).msg.network_attach.user = user;
     LWGSM_MSG_VAR_REF(msg).msg.network_attach.pass = pass;
+#else
+    LWGSM_UNUSED(apn);
+    LWGSM_UNUSED(user);
+    LWGSM_UNUSED(pass);
+#endif
 
     return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 200000);
 }
@@ -99,7 +112,11 @@ lwgsm_network_check_status(const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_ar
 
     LWGSM_MSG_VAR_ALLOC(msg, blocking);
     LWGSM_MSG_VAR_SET_EVT(msg, evt_fn, evt_arg);
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CIPSTATUS;
+#else
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CGATT_GET;
+#endif
 
     return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 60000);
 }
@@ -168,3 +185,69 @@ lwgsm_network_get_reg_status(void) {
     lwgsm_core_unlock();
     return ret;
 }
+
+#if LWGSM_SIM7080
+/**
+ * \brief           Set system network APN settings before asking for attach
+ * \param[in]       idx: APN index. Should be between 1 and 15. If set to `NULL` the index is zero
+ * \param[in]       pdp_type: PDP type. If set to `NULL`, PDP type is IP 
+ * \param[in]       apn: APN domain. Set to `NULL` if not used
+ * \param[in]       pdp_addr: A string parameter that identifies the MT in the address space applicable to the PDP.
+ *                              If `NULL` the address is "0.0.0.0"
+ * \param[in]       d_comp: A numeric parameter that controls PDP data compression. If set to `NULL` compression is OFF
+ * \param[in]       h_comp: A numeric parameter that controls PDP head compression. If set to `NULL` compression is OFF
+ * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t otherwise
+ */
+lwgsmr_t
+lwgsm_network_define_pdp_context(const int idx, const lwgsm_apn_pdp_type_t pdp_type, const char* apn, const char* pdp_addr, const lwgsm_apn_d_comp_t d_comp, const lwgsm_apn_h_comp_t h_comp, const bool ipv4_ctrl, const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking)
+{
+    lwgsm_ip_t* pdp_addr_tmp = lwgsm_mem_calloc(1, sizeof(lwgsm_ip_t));
+
+    LWGSM_MSG_VAR_DEFINE(msg);
+
+    LWGSM_MSG_VAR_ALLOC(msg, blocking);
+    LWGSM_MSG_VAR_SET_EVT(msg, evt_fn, evt_arg);
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_DEFINE_PDP;
+    LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CGACT_SET_0;
+
+    if(idx < 1 || idx > 15){
+        return lwgsmERR;
+    }
+
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.idx = idx;
+    
+    switch (pdp_type)
+    {
+    case APN_PDP_IP:
+        LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IP";
+        break;
+    case APN_PDP_PPP:
+        LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "PPP";
+        break;
+    case APN_PDP_IPV6:
+        LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IPV6";
+        break;
+    case APN_PDP_IPV4V6:
+        LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IPV4V6";
+        break;
+    case APN_PDP_NON_IP:
+        LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "Non-IP";
+        break;
+    default:
+        break;
+    }
+
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.apn = apn;
+
+    lwgsmi_parse_ip(&pdp_addr, pdp_addr_tmp);
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_addr = pdp_addr_tmp;
+
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.d_comp = d_comp;
+
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.h_comp = h_comp;
+
+    LWGSM_MSG_VAR_REF(msg).msg.pdp_context.ipv4_ctrl = (uint8_t) ipv4_ctrl;
+
+    return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 200000);
+}
+#endif

@@ -67,6 +67,12 @@ uint8_t     lwgsmi_parse_cpbf(const char* str);
 
 uint8_t     lwgsmi_parse_cipstatus_conn(const char* str, uint8_t is_conn_line, uint8_t* continueScan);
 
+#if LWGSM_SIM7080
+uint8_t     lwgsmi_parse_cgatt(const char* str);
+uint8_t     lwgsmi_parse_cgnapn(const char* str, uint8_t len);
+uint8_t     lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_error, lwgsm_ip_t*  ip);
+#endif
+
 uint8_t     lwgsmi_parse_ipd(const char* str);
 
 #if defined(__cplusplus)

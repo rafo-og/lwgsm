@@ -58,6 +58,11 @@ uint8_t     lwgsm_network_is_attached(void);
 lwgsmr_t      lwgsm_network_copy_ip(lwgsm_ip_t* ip);
 lwgsmr_t      lwgsm_network_check_status(const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking);
 
+#if LWGSM_SIM7080
+lwgsmr_t
+lwgsm_network_define_pdp_context(const int idx, const lwgsm_apn_pdp_type_t pdp_type, const char* apn, const char* pdp_addr, const lwgsm_apn_d_comp_t d_comp,
+                const lwgsm_apn_h_comp_t h_comp, const bool ipv4_ctrl, const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking);
+#endif
 /**
  * \}
  */

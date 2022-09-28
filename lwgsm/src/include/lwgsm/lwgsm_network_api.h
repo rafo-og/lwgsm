@@ -50,6 +50,10 @@ extern "C" {
 lwgsmr_t  lwgsm_network_set_credentials(const char* apn, const char* user, const char* pass);
 lwgsmr_t  lwgsm_network_request_attach(void);
 lwgsmr_t  lwgsm_network_request_detach(void);
+lwgsmr_t  lwgsm_network_request_define_pdp_context( const int idx, const lwgsm_apn_pdp_type_t pdp_type,
+                                                    const char* apn, const char* pdp_addr, const lwgsm_apn_d_comp_t d_comp,
+                                                    const lwgsm_apn_h_comp_t h_comp, const bool ipv4_ctrl, const bool blocking
+                                                );
 
 /**
  * \}

@@ -993,3 +993,136 @@ lwgsmi_parse_ipd(const char* str) {
 }
 
 #endif /* LWGSM_CFG_CONN */
+
+#if LWGSM_SIM7080
+/**
+ * \brief           Parse +CGATT statement
+ * \param[in]       str: Input string
+ * \return          1 on success, 0 otherwise
+ */
+uint8_t
+lwgsmi_parse_cgatt(const char* str) {
+    uint8_t tmp_pdp_state;
+
+    if (!CMD_IS_CUR(LWGSM_CMD_CGATT_GET)) {
+        return 0;
+    }
+
+    if (*str == '+') {
+        str += 8;
+    }
+
+    tmp_pdp_state = lwgsmi_parse_number(&str);
+
+    /* Check if we have to update status for application */
+    if (lwgsm.m.network.is_attached != tmp_pdp_state) {
+        lwgsm.m.network.is_attached = tmp_pdp_state;
+
+        /* Notify upper layer */
+        lwgsmi_send_cb(lwgsm.m.network.is_attached ? LWGSM_EVT_NETWORK_ATTACHED : LWGSM_EVT_NETWORK_DETACHED);
+    }
+
+    return 1;
+}
+
+/**
+ * \brief           Parse +CGNAPN statement
+ * \param[in]       str: Input string
+ * \param[in]       len: Input string length
+ * \return          1 on success, 0 otherwise
+ */
+uint8_t
+lwgsmi_parse_cgnapn(const char* str, uint8_t len) { 
+    char* tmp_apn;
+    const char* tmp_str;
+    uint8_t tmp_len = len;
+    uint8_t tmp_apn_state;
+    uint8_t apn_length = 0;
+
+    if (!CMD_IS_CUR(LWGSM_CMD_CGNAPN)) {
+        return 0;
+    }
+
+    if (*str == '+') {
+        str += 9;
+    }
+
+    tmp_apn_state = lwgsmi_parse_number(&str);
+
+    if(tmp_apn_state != 1){
+        return 0;
+    }
+
+    ++str;
+    tmp_str = str;
+    tmp_len -= 10;      // Remove read characters
+
+    if(*tmp_str == '"'){
+        do{
+            ++tmp_str;
+            ++apn_length;
+            --tmp_len;
+            if(*tmp_str == '"'){
+                break;
+            }
+        }while(*tmp_str != '\r' && tmp_len > 0);
+    }
+
+    if(apn_length != 0){
+        tmp_apn = lwgsm_mem_calloc(apn_length, sizeof(*tmp_apn));
+        lwgsmi_parse_string(&str, tmp_apn, apn_length, 0);
+        lwgsm.msg->msg.network_attach.apn = tmp_apn;
+    }
+    else{
+        lwgsm.msg->msg.network_attach.apn = NULL;
+        return 0;
+    }
+
+    return 1;
+}
+
+/**
+ * \brief           Parse +CDNSGIP statement
+ * \param[in]       str: Input string
+ * \param[in]       len: Input string length
+ * \param[in]       is_ok: Flag to set if the parsing success
+ * \param[in]       is_error: Flag to set if there is an error
+ * \return          1 on success, 0 otherwise
+ */
+uint8_t
+lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_error, lwgsm_ip_t*  ip) { 
+    
+    uint8_t i = 12;
+
+    if (!CMD_IS_CUR(LWGSM_CMD_CDNSGIP)) {
+        return 0;
+    }
+
+    if (*str == '+') {
+        str += 10;
+    }
+
+    if (*str == '0') {
+        *is_error = 1;
+    }else if(*str == '1'){
+        *is_ok = 1;
+    }
+
+    str += 2;
+
+    do{
+        if(*str == ','){
+            break;
+        }else{
+            ++str;
+        }
+        i++;
+    } while(*str != ',' && i < len);
+
+    if(++i == len){
+        return 0;
+    }
+    
+    return lwgsmi_parse_ip(&str, ip);
+}
+#endif
