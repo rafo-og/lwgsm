@@ -260,9 +260,27 @@ typedef enum {
     LWGSM_CMD_CNACT_SET_1,                      /*!< PDP configure */
     LWGSM_CMD_CMNB_SET,                         /*!< Set preferred network type */
     LWGSM_CMD_CGDCONT,                          /*!< Define PDP Context */
-    /* AT COMMANDS SEQUENCE */
+    /* File System AT commands */
+    LWGSM_CMD_CFSINIT,                          /*!< Get Flash Data Buffer */
+    LWGSM_CMD_CFSWFILE,                         /*!< Write File to the Flash Buffer Allocated by CFSINIT */
+    LWGSM_CMD_CFSRFILE,                         /*!< Read File from Flash */
+    LWGSM_CMD_CFSTERM,                          /*!< Free the Flash Buffer Allocated by CFSINIT */
+    /* SSL AT commands */
+    LWGSM_CMD_CSSLCFG_VER,                      /*!< Configure SSL Version of a Context Identifier */
+    LWGSM_CMD_CSSLCFG_CIPH_SET,                 /*!< Set CIPHER for SSL/TLS */
+    LWGSM_CMD_CSSLCFG_SNI_SET,                  /*!< Set SNI for SSL/TLS */
+    LWGSM_CMD_CASSLCFG_CONVERT,                 /*!< Convert SSL certificate */
+    // LWGSM_CMD_CASSLCFG_SET_SSL_0,            /*!< Set to 0 SSL functionality */
+    LWGSM_CMD_CASSLCFG_SSL_SET_1,               /*!< Set to 1 SSL functionality */
+    LWGSM_CMD_CASSLCFG_CRINDEX,                 /*!< Set ID corresponding to SSL configuration */
+    LWGSM_CMD_CASSLCFG_SET_CAROOT,              /*!< Set root certificate */
+    LWGSM_CMD_CASSLCFG_SET_CLIENTCERT,          /*!< Set up client certificate */
+    /* TCP/UDP commands */
+    LWGSM_CMD_CAOPEN,                           /*!< Open a TCP/UDP Connection */
+    /* AT COMMANDS SEQUENCES */
     LWGSM_CMD_DEFINE_PDP,                       /*!< Define new PDP context */
     LWGSM_CMD_CONN_START,                       /*!< Start new connection to server */
+    LWGSM_CMD_FS_WRITE,                         /*!< Write certificate to module */
 #endif
 
     LWGSM_CMD_END,                              /*!< Last CMD entry */
@@ -425,6 +443,14 @@ typedef struct lwgsm_msg {
             lwgsm_evt_fn evt_func;              /*!< Callback function to use on connection */
             uint8_t num;                        /*!< Connection number used for start */
             lwgsm_conn_connect_res_t conn_res;  /*!< Connection result status */
+#if LWGSM_SIM7080 && LWGSM_SSL_STACK
+            lwgsm_ssl_cert_type_t cert_type;    /*!< Certificate type for conversion */
+            const char* ca_root_cert;           /*!< CA Root Certificate filename */
+            const char* client_cert;            /*!< Client certificate filename */
+            const char* client_key;             /*!< Client RSA private key filename */
+            lwgsm_ssl_version_t ssl_ver;        /*!< SSL version used by the connection */
+            lwgsm_ssl_cypher__t ssl_cypher;     /*!< SSL cypher suite */
+#endif
         } conn_start;                           /*!< Structure for starting new connection */
         struct {
             lwgsm_conn_t* conn;                 /*!< Pointer to connection to close */
@@ -540,9 +566,13 @@ typedef struct lwgsm_msg {
             uint8_t ipv4_ctrl;
         } pdp_context;
         struct{
-            const char* ca_root;
-            const char* client_cert;
-        } certs_write;
+            const char* data;
+            const char* file_name;
+            uint32_t file_size;
+            uint8_t idx;
+            uint8_t mode;
+            uint32_t timeout;
+        } fs_write;
 #endif
     } msg;                                      /*!< Group of different possible message contents */
 } lwgsm_msg_t;

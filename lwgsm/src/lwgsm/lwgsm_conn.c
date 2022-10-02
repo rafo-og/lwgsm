@@ -205,6 +205,14 @@ lwgsm_conn_start(lwgsm_conn_p* conn, lwgsm_conn_type_t type, const char* const h
 #else
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CONN_START;
     LWGSM_MSG_VAR_REF(msg).cmd = LWGSM_CMD_CDNSCFG;
+
+#if LWGSM_SSL_STACK
+    LWGSM_MSG_VAR_REF(msg).msg.conn_start.ca_root_cert = CA_ROOT_LABEL;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_start.client_cert = CLIENT_CERT_LABEL;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_start.client_key = CLIENT_KEY_LABEL;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_start.ssl_ver = LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_TLS_1_2;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_start.ssl_cypher = LWGSM_SSL_CYPHER_ECDHE_ECDSA_AES_128_GCM_SHA256;
+#endif
 #endif
 
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.num = LWGSM_CFG_MAX_CONNS;/* Set maximal value as invalid number */
@@ -214,6 +222,7 @@ lwgsm_conn_start(lwgsm_conn_p* conn, lwgsm_conn_type_t type, const char* const h
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.port = port;
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.evt_func = conn_evt_fn;
     LWGSM_MSG_VAR_REF(msg).msg.conn_start.arg = arg;
+
 
     return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 60000);
 }

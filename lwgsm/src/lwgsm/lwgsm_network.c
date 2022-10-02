@@ -196,6 +196,7 @@ lwgsm_network_get_reg_status(void) {
  *                              If `NULL` the address is "0.0.0.0"
  * \param[in]       d_comp: A numeric parameter that controls PDP data compression. If set to `NULL` compression is OFF
  * \param[in]       h_comp: A numeric parameter that controls PDP head compression. If set to `NULL` compression is OFF
+ * \param[in]       blocking: Status whether command should be blocking or not
  * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t otherwise
  */
 lwgsmr_t

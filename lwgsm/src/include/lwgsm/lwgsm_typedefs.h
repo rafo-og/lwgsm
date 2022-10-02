@@ -154,6 +154,37 @@ typedef enum {
     LWGSM_CONN_TYPE_SSL,                        /*!< Connection type is TCP over SSL */
 } lwgsm_conn_type_t;
 
+#if LWGSM_SIM7080 && LWGSM_SSL_STACK
+/**
+ * \brief           List of possible SSL versions
+ */
+typedef enum{
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_UNKNOWN,
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_TLS_1_0,
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_TLS_1_1,
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_TLS_1_2,
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_DTLS_1_0,
+    LWGSM_SSL_VERSION_QAPI_NET_SSL_PROTOCOL_DTLS_1_2
+} lwgsm_ssl_version_t;
+/**
+ * \brief           List of possible certificate types
+ */
+typedef enum{
+    LWGSM_SSL_CERT_TYPE_CERTIFICATE = 1,
+    LWGSM_SSL_CERT_TYPE_CA_LIST = 2,
+    LWGSM_SSL_CERT_TYPE_PSK_TABLE = 3,
+} lwgsm_ssl_cert_type_t;
+/**
+ * \brief           List of possible Cypher Suits
+ */
+typedef enum{
+    /* Recommended by AWS */
+    LWGSM_SSL_CYPHER_ECDHE_ECDSA_AES_128_GCM_SHA256 = 0xC02B,
+    LWGSM_SSL_CYPHER_ECDHE_RSA_AES_128_GCM_SHA256 = 0xC02F
+} lwgsm_ssl_cypher__t;
+
+#endif
+
 /**
  * \ingroup         LWGSM_TYPEDEFS
  * \brief           Available device memories

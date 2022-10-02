@@ -305,7 +305,7 @@ lwgsm_netconn_connect(lwgsm_netconn_p nc, const char* host, lwgsm_port_t port) {
      *  - Set netconn callback function for connection management
      *  - Start connection in blocking mode
      */
-    res = lwgsm_conn_start(NULL, (lwgsm_conn_type_t)nc->type, host, port, nc, netconn_evt, 1);
+    res = lwgsm_conn_start(&nc->conn, (lwgsm_conn_type_t)nc->type, host, port, nc, netconn_evt, 1);
     return res;
 }
 

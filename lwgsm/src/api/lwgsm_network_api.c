@@ -139,6 +139,10 @@ lwgsm_network_request_detach(void) {
  *                              If `NULL` the address is "0.0.0.0"
  * \param[in]       d_comp: A numeric parameter that controls PDP data compression. If set to `NULL` compression is OFF
  * \param[in]       h_comp: A numeric parameter that controls PDP head compression. If set to `NULL` compression is OFF
+ * \param[in]       ipv4_ctrl: Controls how the MT/TA requests to get the IPv4 address information:
+ *                          - 0: Address Allocation through NAS Signaling
+ *                          - 1: On 
+ * \param[in]       blocking: Status whether command should be blocking or not
  * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t otherwise
  */
 lwgsmr_t

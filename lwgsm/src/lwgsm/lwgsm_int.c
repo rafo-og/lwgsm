@@ -70,6 +70,7 @@ typedef struct {
 #define AT_PORT_SEND_QUOTE_COND(q)          do { if ((q)) { AT_PORT_SEND_CONST_STR("\""); } } while (0)
 #define AT_PORT_SEND_COMMA_COND(c)          do { if ((c)) { AT_PORT_SEND_CONST_STR(","); } } while (0)
 #define AT_PORT_SEND_EQUAL_COND(e)          do { if ((e)) { AT_PORT_SEND_CONST_STR("="); } } while (0)
+#define AT_PORT_SEND_HEX_COND(h)            do { if ((h)) { AT_PORT_SEND_CONST_STR("0x"); } } while (0)
 
 /* Send special characters */
 #define AT_PORT_SEND_CTRL_Z()               AT_PORT_SEND_STR("\x1A")
@@ -310,6 +311,29 @@ lwgsmi_send_number(uint32_t num, uint8_t q, uint8_t c) {
 
     AT_PORT_SEND_COMMA_COND(c);                 /* Send comma */
     AT_PORT_SEND_QUOTE_COND(q);                 /* Send quote */
+    AT_PORT_SEND_STR(str);                      /* Send string with number */
+    AT_PORT_SEND_QUOTE_COND(q);                 /* Send quote */
+}
+
+
+/**
+ * \brief           Send number (hex) to AT port
+ * \param[in]       num: Number to send to AT port
+ * \param[in]       w: Width of output string.
+ *                      When number is shorter than width, leading `0` characters will apply.
+ * \param[in]       h: Send `0x` before the number
+ * \param[in]       q: Value to indicate starting and ending quotes, enabled (`1`) or disabled (`0`)
+ * \param[in]       c: Set to `1` to include comma before string
+ */
+void
+lwgsmi_send_hex_number(uint32_t num, uint32_t w, uint8_t h, uint8_t q, uint8_t c) {
+    char str[11];
+
+    lwgsm_u32_to_hex_str(num, str, w);          /* Convert digit to hex string */
+
+    AT_PORT_SEND_COMMA_COND(c);                 /* Send comma */
+    AT_PORT_SEND_QUOTE_COND(q);                 /* Send quote */
+    AT_PORT_SEND_HEX_COND(h);                   /* Send hex indicator */
     AT_PORT_SEND_STR(str);                      /* Send string with number */
     AT_PORT_SEND_QUOTE_COND(q);                 /* Send quote */
 }
@@ -868,6 +892,10 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
             lwgsmi_parse_ip(&tmp, &lwgsm.m.network.ip_addr);/* Parse IP address */
 
             is_ok = 1;                          /* Manually set OK flag as we don't expect OK in CIFSR command */
+#if LWGSM_SIM7080 && LWGSM_SSL_STACK
+        } else if (rcv->data[0] == 'D' && !strncmp(rcv->data, "DOWNLOAD" CRLF, 8 + CRLF_LEN)) {
+            AT_PORT_SEND_WITH_FLUSH(lwgsm.msg->msg.fs_write.data, lwgsm.msg->msg.fs_write.file_size);
+#endif
         }
     }
 
@@ -967,8 +995,9 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
                 is_ok = 0;
             }
             if(!strncmp(rcv->data, "+CDNSGIP", 8)){
+                
                 lwgsmi_parse_cdnsgip(rcv->data, rcv->len, &is_ok, &is_error,
-                        &((*(lwgsm_conn_t*)lwgsm.msg->msg.conn_start.arg).remote_ip));       /* Parse +CDNSGIP statement */
+                        (lwgsm_ip_t*)(&((*(lwgsm.msg->msg.conn_start.conn))->remote_ip)));       /* Parse +CDNSGIP statement */
             }
 #endif
         }
@@ -1737,6 +1766,55 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
         switch (msg->i) {
             case 0:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CDNSGIP);
+                if(msg->msg.conn_start.type != LWGSM_CONN_TYPE_SSL){
+                    msg->i += 7;        // The SSL steps should not be executed in this case
+                }
+                break;
+#if LWGSM_SSL_STACK
+            case 1:
+                msg->msg.conn_start.cert_type = LWGSM_SSL_CERT_TYPE_CA_LIST;
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CONVERT);
+                break;
+            case 2:
+                msg->msg.conn_start.cert_type = LWGSM_SSL_CERT_TYPE_CERTIFICATE;
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CONVERT);
+                break;
+            case 3:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CSSLCFG_VER);
+                break;
+            case 4:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CSSLCFG_CIPH_SET);
+                break;
+            case 5:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CSSLCFG_SNI_SET);
+                break;
+            case 6:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_SSL_SET_1);
+                break;
+            case 7:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CRINDEX);
+                break;
+            case 8:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_SET_CAROOT);
+                break;
+            case 9:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_SET_CLIENTCERT);
+                break;
+#endif
+            case 10:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CAOPEN);
+                break;
+            default:
+                break;
+        }
+    }else if(CMD_IS_DEF(LWGSM_CMD_FS_WRITE)) {
+        switch (msg->i) {
+            case 0:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CFSWFILE);
+                break;
+            case 1:
+                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CFSTERM);
+                break;
             default:
                 break;
         }
@@ -2379,11 +2457,11 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             lwgsmi_send_number(msg->msg.pdp_context.idx, 0, 0);
             lwgsmi_send_string(msg->msg.pdp_context.pdp_type, 0, 1, 1);
             lwgsmi_send_string(msg->msg.pdp_context.apn, 0, 1, 1);
-            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.d_comp, 0, msg->msg.pdp_context.d_comp
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.d_comp), 0, msg->msg.pdp_context.d_comp
                                     || msg->msg.pdp_context.h_comp || msg->msg.pdp_context.ipv4_ctrl);
-            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.h_comp, 0, msg->msg.pdp_context.h_comp
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.h_comp), 0, msg->msg.pdp_context.h_comp
                                     || msg->msg.pdp_context.ipv4_ctrl);
-            lwgsmi_send_number((uint32_t) msg->msg.pdp_context.ipv4_ctrl ? 1 : 0, 0, msg->msg.pdp_context.ipv4_ctrl ? 1 : 0);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.ipv4_ctrl) ? 1 : 0, 0, msg->msg.pdp_context.ipv4_ctrl ? 1 : 0);
             AT_PORT_SEND_END_AT();
             break;
         }
@@ -2397,11 +2475,163 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             break;
         }
         case LWGSM_CMD_CDNSGIP:{                /* Resolve the Domain Name */
+            lwgsm_conn_t* c = NULL;
+            /* Do we have network connection? */
+            /* Check if we are connected to network */
+            msg->msg.conn_start.num = 0;        /* Start with max value = invalidated */
+            for (int16_t i = LWGSM_CFG_MAX_CONNS - 1; i >= 0; --i) {/* Find available connection */
+                if (!lwgsm.m.conns[i].status.f.active) {
+                    c = &lwgsm.m.conns[i];
+                    c->num = LWGSM_U8(i);
+                    msg->msg.conn_start.num = LWGSM_U8(i);  /* Set connection number for message structure */
+                    break;
+                }
+            }
+            if (c == NULL) {
+                lwgsmi_send_conn_error_cb(msg, lwgsmERRNOFREECONN);
+                return lwgsmERRNOFREECONN;      /* We don't have available connection */
+            }
+            if (msg->msg.conn_start.conn != NULL) { /* Is user interested about connection info? */
+                *msg->msg.conn_start.conn = c;  /* Save connection for user */
+            }
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CDNSGIP=");
             lwgsmi_send_string(msg->msg.conn_start.host, 0, 1, 0);
             lwgsmi_send_number(5, 0, 1);
             lwgsmi_send_number(10000, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        /* File System commands */
+        case LWGSM_CMD_CFSINIT:{                /* Get Flash Data Buffer */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CFSINIT");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CFSWFILE:{               /* Write File to the Flash Buffer Allocated by CFSINIT */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CFSWFILE=");
+            lwgsmi_send_number(msg->msg.fs_write.idx, 0, 0);
+            lwgsmi_send_string(msg->msg.fs_write.file_name, 0, 1, 1);
+            lwgsmi_send_number(msg->msg.fs_write.mode, 0, 1);
+            lwgsmi_send_number(msg->msg.fs_write.file_size, 0, 1);
+            lwgsmi_send_number(msg->msg.fs_write.timeout, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CFSTERM:{                /* Free the Flash Buffer Allocated by CFSINIT */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CFSTERM");
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        /* SSL */
+#if LWGSM_SSL_STACK
+        case LWGSM_CMD_CSSLCFG_VER:{            /* Configure SSL/TLS version */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CSSLCFG=");
+            lwgsmi_send_string("SSLVERSION", 0, 1, 0);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.ssl_ver), 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CSSLCFG_CIPH_SET:{       /* Set SSL/TLS cypher suite */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CSSLCFG=");
+            lwgsmi_send_string("CIPHERSUITE", 0, 1, 0);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_hex_number(LWGSM_U32(msg->msg.conn_start.ssl_cypher), 4, 1, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CSSLCFG_SNI_SET:{       /* Set SSL/TLS cypher suite */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CSSLCFG=");
+            lwgsmi_send_string("SNI", 0, 1, 0);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_string(msg->msg.conn_start.host, 0, 1 ,1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASSLCFG_CONVERT:{       /* Convert certificate files before use it with TLS stack */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CSSLCFG=");
+            lwgsmi_send_string("CONVERT", 0, 1, 0);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.cert_type), 0, 1);
+            switch (msg->msg.conn_start.cert_type)
+            {
+            case LWGSM_SSL_CERT_TYPE_CERTIFICATE:
+                lwgsmi_send_string(msg->msg.conn_start.client_cert, 0, 1, 1);
+                lwgsmi_send_string(msg->msg.conn_start.client_key, 0, 1, 1);
+                break;
+            case LWGSM_SSL_CERT_TYPE_CA_LIST:
+                lwgsmi_send_string(msg->msg.conn_start.ca_root_cert, 0, 1, 1);         
+                break;
+            default:
+                break;
+            }
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASSLCFG_SSL_SET_1:{     /* Enable SSL/TLS */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CASSLCFG=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_string("SSL", 0, 1, 1);
+            lwgsmi_send_number(1, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASSLCFG_CRINDEX:{       /* Enable SSL/TLS */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CASSLCFG=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_string("CRINDEX", 0, 1, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASSLCFG_SET_CAROOT:{    /* Set root certificate */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CASSLCFG=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_string("CACERT", 0, 1, 1);
+            lwgsmi_send_string(CA_ROOT_LABEL, 0, 1, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASSLCFG_SET_CLIENTCERT:{/* Set up client certificate */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CASSLCFG=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_string("CERT", 0, 1, 1);
+            lwgsmi_send_string(CLIENT_CERT_LABEL, 0, 1, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+#endif
+        case LWGSM_CMD_CAOPEN:{                 /* Open a TCP/UDP Connection */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CAOPEN=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(0, 0, 1);
+            switch(msg->msg.conn_start.type){
+                case LWGSM_CONN_TYPE_UDP:
+                    lwgsmi_send_string("UDP", 0, 1, 1);
+                    break;
+                case LWGSM_CONN_TYPE_TCP:
+                    lwgsmi_send_string("TCP", 0, 1, 1);
+                    break;
+                case LWGSM_CONN_TYPE_SSL:
+                    lwgsmi_send_string("TCP", 0, 1, 1);
+                    break;
+            }
+            // lwgsmi_send_ip_mac(&((*(msg->msg.conn_start.conn))->remote_ip), 1, 1, 1);
+            lwgsmi_send_string(msg->msg.conn_start.host, 0, 1 ,1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.port), 0, 1);
             AT_PORT_SEND_END_AT();
             break;
         }

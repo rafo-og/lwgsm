@@ -29,6 +29,7 @@ set(SRC_FILES   ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/api/${target}_netconn.
                 ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/${target}/${target}_unicode.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/${target}/${target}_ussd.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/${target}/${target}_utils.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/${target}/${target}_certs.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/${target}/${target}.c
                 # LIBRARY PORT
                 ${CMAKE_CURRENT_SOURCE_DIR}/${target}/src/system/${target}_ll_esp32.c
