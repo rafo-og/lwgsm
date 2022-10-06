@@ -277,6 +277,8 @@ typedef enum {
     LWGSM_CMD_CASSLCFG_SET_CLIENTCERT,          /*!< Set up client certificate */
     /* TCP/UDP commands */
     LWGSM_CMD_CAOPEN,                           /*!< Open a TCP/UDP Connection */
+    LWGSM_CMD_CACLOSE,                          /*!< Close a TCP/UDP Connection */
+    LWGSM_CMD_CASEND,                           /*!< Send Data via an Established Connection */
     /* AT COMMANDS SEQUENCES */
     LWGSM_CMD_DEFINE_PDP,                       /*!< Define new PDP context */
     LWGSM_CMD_CONN_START,                       /*!< Start new connection to server */

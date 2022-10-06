@@ -676,6 +676,15 @@ void *  my_memset(void* dst, int b, size_t len);
 #define LWGSM_NET_TYPE_BOTH    3
 #endif
 
+/**
+ * \brief           Set debug level for memory manager
+ *
+ * Possible values are \ref LWGSM_DBG_ON or \ref LWGSM_DBG_OFF
+ */
+#ifndef LWGSM_CFG_DBG_LL
+#define LWGSM_CFG_DBG_LL                     LWGSM_DBG_OFF
+#endif
+
 #endif
 
 

@@ -219,19 +219,19 @@ lwgsm_network_define_pdp_context(const int idx, const lwgsm_apn_pdp_type_t pdp_t
     
     switch (pdp_type)
     {
-    case APN_PDP_IP:
+    case LWGSM_PDP_TYPE_IP:
         LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IP";
         break;
-    case APN_PDP_PPP:
+    case LWGSM_PDP_TYPE_PPP:
         LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "PPP";
         break;
-    case APN_PDP_IPV6:
+    case LWGSM_PDP_TYPE_IPV6:
         LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IPV6";
         break;
-    case APN_PDP_IPV4V6:
+    case LWGSM_PDP_TYPE_IPV4V6:
         LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "IPV4V6";
         break;
-    case APN_PDP_NON_IP:
+    case LWGSM_PDP_TYPE_NON_IP:
         LWGSM_MSG_VAR_REF(msg).msg.pdp_context.pdp_type = "Non-IP";
         break;
     default:

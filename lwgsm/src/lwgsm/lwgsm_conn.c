@@ -126,7 +126,11 @@ conn_send(lwgsm_conn_p conn, const lwgsm_ip_t* const ip, lwgsm_port_t port, cons
     CONN_CHECK_CLOSED_IN_CLOSING(conn);         /* Check if we can continue */
 
     LWGSM_MSG_VAR_ALLOC(msg, blocking);
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CIPSEND;
+#else
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CASEND;
+#endif
 
     LWGSM_MSG_VAR_REF(msg).msg.conn_send.conn = conn;
     LWGSM_MSG_VAR_REF(msg).msg.conn_send.data = data;
@@ -244,7 +248,11 @@ lwgsm_conn_close(lwgsm_conn_p conn, const uint32_t blocking) {
 
     /* Proceed with close event at this point! */
     LWGSM_MSG_VAR_ALLOC(msg, blocking);
+#if !LWGSM_SIM7080
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CIPCLOSE;
+#else
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CACLOSE;
+#endif
     LWGSM_MSG_VAR_REF(msg).msg.conn_close.conn = conn;
     LWGSM_MSG_VAR_REF(msg).msg.conn_close.val_id = lwgsmi_conn_get_val_id(conn);
 

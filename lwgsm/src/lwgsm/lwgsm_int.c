@@ -559,7 +559,11 @@ lwgsmi_tcpip_process_send_data(void) {
     lwgsm.msg->msg.conn_send.sent = LWGSM_MIN(lwgsm.msg->msg.conn_send.btw, LWGSM_CFG_CONN_MAX_DATA_LEN);
 
     AT_PORT_SEND_BEGIN_AT();
+#if !LWGSM_SIM7080
     AT_PORT_SEND_CONST_STR("+CIPSEND=");
+#else
+    AT_PORT_SEND_CONST_STR("+CASEND=");
+#endif
     lwgsmi_send_number(LWGSM_U32(c->num), 0, 0);/* Send connection number */
     lwgsmi_send_number(LWGSM_U32(lwgsm.msg->msg.conn_send.sent), 0, 1); /* Send length number */
 
@@ -800,6 +804,12 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
             lwgsmi_parse_cgatt(rcv->data);                  /* Parse +CGATT statement */
         } else if(CMD_IS_CUR(LWGSM_CMD_CGNAPN) && !strncmp(rcv->data, "+CGNAPN", 7)){
             lwgsmi_parse_cgnapn(rcv->data, rcv->len);        /* Parse +CGNAPN statement */
+        } else if(CMD_IS_CUR(LWGSM_CMD_CAOPEN) && !strncmp(rcv->data, "+CAOPEN", 7)){
+            lwgsmi_parse_caopen(rcv->data, rcv->len, &is_error);        /* Parse +CAOPEN statement */
+        } else if(!strncmp(rcv->data, "+CASTATE", 8)){
+            lwgsmi_parse_castate(rcv->data, rcv->len);                  /* Parse +CASTATE statement */
+        } else if(!strncmp(rcv->data, "+CAURC", 6)){
+            lwgsmi_parse_ipd(rcv->data);                      /* Parse +CAURC statement */
 #endif
         }
 
@@ -998,6 +1008,17 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
                 
                 lwgsmi_parse_cdnsgip(rcv->data, rcv->len, &is_ok, &is_error,
                         (lwgsm_ip_t*)(&((*(lwgsm.msg->msg.conn_start.conn))->remote_ip)));       /* Parse +CDNSGIP statement */
+            }
+        } else if(CMD_IS_CUR(LWGSM_CMD_CACLOSE)){
+            if (is_ok) {
+                if(lwgsmi_conn_closed_process(lwgsm.msg->msg.conn_close.conn->num, 0)){
+                    LWGSM_DEBUGF(LWGSM_CFG_DBG_CONN | LWGSM_DBG_TYPE_TRACE,
+                        "[CONN] Connection %d closed succesfully\r\n", (int)lwgsm.msg->msg.conn_close.conn->num);
+                }
+                else{
+                    LWGSM_DEBUGF(LWGSM_CFG_DBG_CONN | LWGSM_DBG_TYPE_TRACE,
+                        "[CONN] Connection %d closing ERROR\r\n", (int)lwgsm.msg->msg.conn_close.conn->num);
+                }
             }
 #endif
         }
@@ -1311,7 +1332,11 @@ lwgsmi_process(const void* data, size_t data_len) {
                     if (ch_prev2 == '\n' && ch_prev1 == '>' && ch == ' ') {
                         if (0) {
 #if LWGSM_CFG_CONN
+#if !LWGSM_SIM7080
                         } else if (CMD_IS_CUR(LWGSM_CMD_CIPSEND)) {
+#else
+                        } else if (CMD_IS_CUR(LWGSM_CMD_CASEND)) {
+#endif
                             RECV_RESET();       /* Reset received object */
 
                             /* Now actually send the data prepared before */
@@ -1767,7 +1792,7 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
             case 0:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CDNSGIP);
                 if(msg->msg.conn_start.type != LWGSM_CONN_TYPE_SSL){
-                    msg->i += 7;        // The SSL steps should not be executed in this case
+                    msg->i += 9;        // The SSL steps should not be executed in this case
                 }
                 break;
 #if LWGSM_SSL_STACK
@@ -1776,8 +1801,15 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CONVERT);
                 break;
             case 2:
-                msg->msg.conn_start.cert_type = LWGSM_SSL_CERT_TYPE_CERTIFICATE;
-                SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CONVERT);
+                // Skip this command if client certificate pointer is NULL
+                if(msg->msg.conn_start.client_cert != NULL){
+                    msg->msg.conn_start.cert_type = LWGSM_SSL_CERT_TYPE_CERTIFICATE;
+                    SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASSLCFG_CONVERT);
+                }
+                else{
+                    ++msg->i;
+                    SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CSSLCFG_VER);
+                }
                 break;
             case 3:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CSSLCFG_VER);
@@ -1804,6 +1836,32 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
             case 10:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CAOPEN);
                 break;
+            case 11:
+                /* After CAOPEN, define what to do next */
+                switch (msg->msg.conn_start.conn_res) {
+                    case LWGSM_CONN_CONNECT_OK: {   /* Successfully connected */
+                        lwgsm_conn_t* conn = &lwgsm.m.conns[msg->msg.conn_start.num];   /* Get connection number */
+
+                        lwgsm.evt.type = LWGSM_EVT_CONN_ACTIVE; /* Connection just active */
+                        lwgsm.evt.evt.conn_active_close.client = 1;
+                        lwgsm.evt.evt.conn_active_close.conn = conn;
+                        lwgsm.evt.evt.conn_active_close.forced = 1;
+                        lwgsmi_send_conn_cb(conn, NULL);
+                        lwgsmi_conn_start_timeout(conn);/* Start connection timeout timer */
+                        break;
+                    }
+                    case LWGSM_CONN_CONNECT_ERROR: {/* Connection error */
+                        lwgsmi_send_conn_error_cb(msg, lwgsmERRCONNFAIL);
+                        *is_error = 1;              /* Manually set error */
+                        *is_ok = 0;                 /* Reset success */
+                        break;
+                    }
+                    default: {
+                        /* Do nothing as of now */
+                        break;
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -1817,6 +1875,24 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 break;
             default:
                 break;
+        }
+    } else if (CMD_IS_DEF(LWGSM_CMD_CACLOSE)) {
+        /*
+         * It is unclear in which state connection is when ERROR is received on close command.
+         * Stack checks if connection is closed before it allows and sends close command,
+         * however it was detected that no automatic close event has been received from device
+         * and AT+CIPCLOSE returned ERROR.
+         *
+         * Is it device firmware bug?
+         */
+        if (CMD_IS_CUR(LWGSM_CMD_CACLOSE) && *is_error) {
+            /* Notify upper layer about failed close event */
+            lwgsm.evt.type = LWGSM_EVT_CONN_CLOSE;
+            lwgsm.evt.evt.conn_active_close.conn = msg->msg.conn_close.conn;
+            lwgsm.evt.evt.conn_active_close.forced = 1;
+            lwgsm.evt.evt.conn_active_close.res = lwgsmERR;
+            lwgsm.evt.evt.conn_active_close.client = msg->msg.conn_close.conn->status.f.active && msg->msg.conn_close.conn->status.f.client;
+            lwgsmi_send_conn_cb(msg->msg.conn_close.conn, NULL);
         }
 #endif
     }
@@ -2629,9 +2705,25 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
                     lwgsmi_send_string("TCP", 0, 1, 1);
                     break;
             }
-            // lwgsmi_send_ip_mac(&((*(msg->msg.conn_start.conn))->remote_ip), 1, 1, 1);
             lwgsmi_send_string(msg->msg.conn_start.host, 0, 1 ,1);
             lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.port), 0, 1);
+            lwgsmi_send_number(1, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CASEND: {                /* Send data to connection */
+            return lwgsmi_tcpip_process_send_data();/* Process send data */
+        }
+        case LWGSM_CMD_CACLOSE: {               /* Close the connection */
+            lwgsm_conn_p c = msg->msg.conn_close.conn;
+            if (c != NULL &&
+                /* Is connection already closed or command for this connection is not valid anymore? */
+                (!lwgsm_conn_is_active(c) || c->val_id != msg->msg.conn_close.val_id)) {
+                return lwgsmERR;
+            }
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CACLOSE=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_close.conn ? msg->msg.conn_close.conn->num : LWGSM_CFG_MAX_CONNS), 0, 0);
             AT_PORT_SEND_END_AT();
             break;
         }
@@ -2734,6 +2826,7 @@ lwgsmi_process_events_for_timeout_or_error(lwgsm_msg_t* msg, lwgsmr_t err) {
         }
 
 #if LWGSM_CFG_CONN
+#if !LWGSM_SIM7080
         case LWGSM_CMD_CIPSTART: {
             /* Start connection error */
             lwgsmi_send_conn_error_cb(msg, err);
@@ -2745,6 +2838,19 @@ lwgsmi_process_events_for_timeout_or_error(lwgsm_msg_t* msg, lwgsmr_t err) {
             CONN_SEND_DATA_SEND_EVT(msg, err);
             break;
         }
+#else
+        case LWGSM_CMD_CAOPEN: {
+            /* Start connection error */
+            lwgsmi_send_conn_error_cb(msg, err);
+            break;
+        }
+
+        case LWGSM_CMD_CASEND: {
+            /* Send data error event */
+            CONN_SEND_DATA_SEND_EVT(msg, err);
+            break;
+        }
+#endif
 #endif /* LWGSM_CFG_CONN */
 
 #if LWGSM_CFG_SMS

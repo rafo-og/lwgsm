@@ -80,6 +80,10 @@ lwgsmr_t          lwgsm_netconn_flush(lwgsm_netconn_p nc);
 lwgsmr_t          lwgsm_netconn_send(lwgsm_netconn_p nc, const void* data, size_t btw);
 lwgsmr_t          lwgsm_netconn_sendto(lwgsm_netconn_p nc, const lwgsm_ip_t* ip, lwgsm_port_t port, const void* data, size_t btw);
 
+#if LWGSM_SIM7080
+lwgsmr_t    lwgsm_netconn_connect_async(lwgsm_netconn_p nc, const char* host, lwgsm_port_t port);
+uint8_t     lwgsm_netconn_is_connected(lwgsm_netconn_p nc);
+#endif
 /**
  * \}
  */

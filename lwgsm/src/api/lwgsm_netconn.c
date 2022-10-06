@@ -556,4 +556,39 @@ lwgsm_netconn_get_receive_timeout(lwgsm_netconn_p nc) {
 
 #endif /* LWGSM_CFG_NETCONN_RECEIVE_TIMEOUT || __DOXYGEN__ */
 
+
+#if LWGSM_SIM7080
+/**
+ * \brief           Connect to server as client asynchronously
+ * \param[in]       nc: Netconn handle
+ * \param[in]       host: Pointer to host, such as domain name or IP address in string format
+ * \param[in]       port: Target port to use
+ * \return          \ref lwgsmOK if successfully connected, member of \ref lwgsmr_t otherwise
+ */
+lwgsmr_t
+lwgsm_netconn_connect_async(lwgsm_netconn_p nc, const char* host, lwgsm_port_t port) {
+    lwgsmr_t res;
+
+    LWGSM_ASSERT("nc != NULL", nc != NULL);
+    LWGSM_ASSERT("host != NULL", host != NULL);
+    LWGSM_ASSERT("port > 0", port > 0);
+
+    /*
+     * Start a new connection as client and:
+     *
+     *  - Set current netconn structure as argument
+     *  - Set netconn callback function for connection management
+     *  - Start connection in blocking mode
+     */
+    res = lwgsm_conn_start(&nc->conn, (lwgsm_conn_type_t)nc->type, host, port, nc, netconn_evt, 0);
+    return res;
+}
+
+uint8_t
+lwgsm_netconn_is_connected(lwgsm_netconn_p nc){
+    return lwgsm_conn_is_active(nc->conn);
+}
+
+#endif
+
 #endif /* LWGSM_CFG_NETCONN || __DOXYGEN__ */

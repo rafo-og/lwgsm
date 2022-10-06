@@ -127,12 +127,15 @@ static void usart_ll_thread(void* arg)
                 be full.*/
                 case UART_DATA:
                     uart_read_bytes(LWGSM_UART_NUM, dtmp, event.size, portMAX_DELAY);
+#if LWGSM_CFG_DBG_LL
                     printf("[DATA EVT]:");
                     for(int i=0; i<event.size; i++){
                         printf("%c", *(dtmp + i));
                     }
                     printf("\r\n");
+#endif
                     lwgsm_input_process(dtmp, event.size);
+                    // lwgsm_input(dtmp, event.size);
                     break;
                 //Others
                 default:
@@ -216,7 +219,7 @@ static size_t send_data(const void* data, size_t len)
  {
     int sent = 0;
 
-#if LWGSM_UART_DEBUG_LEVEL == ESP_LOG_DEBUG
+#if LWGSM_CFG_DBG_LL
     int i = 0;
     if(len > 0){
         printf("Sending data (%d bytes):", len);
@@ -227,6 +230,7 @@ static size_t send_data(const void* data, size_t len)
         printf("\r\n");
     }
 #endif
+
     if(len > 0){
         sent = uart_write_bytes(LWGSM_UART_NUM, (const char*) data, len);
     } 

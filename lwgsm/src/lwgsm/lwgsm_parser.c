@@ -956,6 +956,7 @@ lwgsmi_parse_cipstatus_conn(const char* str, uint8_t is_conn_line, uint8_t* cont
     return 1;
 }
 
+#if !LWGSM_SIM7080
 /**
  * \brief           Parse IPD or RECEIVE statements
  * \param[in]       str: Input string
@@ -991,6 +992,7 @@ lwgsmi_parse_ipd(const char* str) {
 
     return 1;
 }
+#endif
 
 #endif /* LWGSM_CFG_CONN */
 
@@ -1001,7 +1003,8 @@ lwgsmi_parse_ipd(const char* str) {
  * \return          1 on success, 0 otherwise
  */
 uint8_t
-lwgsmi_parse_cgatt(const char* str) {
+lwgsmi_parse_cgatt(const char* str)
+{
     uint8_t tmp_pdp_state;
 
     if (!CMD_IS_CUR(LWGSM_CMD_CGATT_GET)) {
@@ -1032,7 +1035,8 @@ lwgsmi_parse_cgatt(const char* str) {
  * \return          1 on success, 0 otherwise
  */
 uint8_t
-lwgsmi_parse_cgnapn(const char* str, uint8_t len) { 
+lwgsmi_parse_cgnapn(const char* str, uint8_t len)
+{ 
     char* tmp_apn;
     const char* tmp_str;
     uint8_t tmp_len = len;
@@ -1090,8 +1094,8 @@ lwgsmi_parse_cgnapn(const char* str, uint8_t len) {
  * \return          1 on success, 0 otherwise
  */
 uint8_t
-lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_error, lwgsm_ip_t*  ip) { 
-    
+lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_error, lwgsm_ip_t*  ip)
+{  
     uint8_t i = 12;
 
     if (!CMD_IS_CUR(LWGSM_CMD_CDNSGIP)) {
@@ -1124,5 +1128,141 @@ lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_
     }
     
     return lwgsmi_parse_ip(&str, ip);
+}
+
+/**
+ * \brief           Parse +CAOPEN statement
+ * \param[in]       str: Input string
+ * \param[in]       len: Input string length
+ * \param[in]       is_error: Flag to set if there is an error
+ * \return          1 on success, 0 otherwise
+ */
+uint8_t
+lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error)
+{     
+    uint8_t num;
+    uint8_t id;
+    uint8_t conn_state;
+    lwgsm_conn_t* conn;
+
+    if (*str == '+') {
+        str += 9;
+    }
+
+    /* Parse connection line */
+    num = LWGSM_U8(lwgsmi_parse_number(&str));
+
+    if (num < LWGSM_CFG_MAX_CONNS) {
+        conn = &lwgsm.m.conns[num];     /* Get connection handle */
+        conn_state = LWGSM_U8(lwgsmi_parse_number(&str));
+    
+        if(conn_state == 0){
+            id = conn->val_id;
+            LWGSM_MEMSET(conn, 0x00, sizeof(*conn));/* Reset connection parameters */
+            conn->num = num;
+            conn->status.f.active = 1;
+            conn->val_id = ++id;    /* Set new validation ID */
+            /* Set connection parameters */
+            conn->status.f.client = 1;
+            conn->evt_func = lwgsm.msg->msg.conn_start.evt_func;
+            conn->arg = lwgsm.msg->msg.conn_start.arg;
+
+            /* Set status */
+            lwgsm.msg->msg.conn_start.conn_res = LWGSM_CONN_CONNECT_OK;
+        }else{
+            lwgsm.msg->msg.conn_start.conn_res = LWGSM_CONN_CONNECT_ERROR;
+            *is_error = 1;
+        }
+
+        if(conn_state != 0){
+            conn->status.f.active = 0;
+        }else{
+            conn->status.f.active = 1;
+        }
+
+        lwgsm.msg->res = lwgsmERRCONNFAIL;
+        
+        /* Save last parsed connection */
+        lwgsm.m.active_conns_cur_parse_num = num;
+    }
+
+
+    return 1;
+}
+
+/**
+ * \brief           Parse +CASTATE statement
+ * \param[in]       str: Input string
+ * \param[in]       len: Input string length
+ * \return          1 on success, 0 otherwise
+ */
+uint8_t
+lwgsmi_parse_castate(const char* str, uint8_t len)
+{     
+    uint8_t num;
+    uint8_t conn_state;
+    lwgsm_conn_t* conn;
+
+    if (*str == '+') {
+        str += 10;
+    }
+
+    /* Parse connection line */
+    num = LWGSM_U8(lwgsmi_parse_number(&str));
+
+    if (num < LWGSM_CFG_MAX_CONNS) {
+        conn = &lwgsm.m.conns[num];     /* Get connection handle */
+        conn_state = LWGSM_U8(lwgsmi_parse_number(&str));
+    
+        if(conn_state == 0){
+            if (conn->status.f.active) {            /* Check if connection is not */
+                lwgsmi_conn_closed_process(conn->num, 0);   /* Process closed event */
+            }
+        }
+    }
+
+
+    return 1;
+}
+
+/**
+ * \brief           Parse CAURC statements
+ * \param[in]       str: Input string
+ * \return          `1` on success, `0` otherwise
+ */
+uint8_t
+lwgsmi_parse_ipd(const char* str) {
+    uint8_t conn;
+    size_t len;
+    lwgsm_conn_p c;
+
+    if (*str == '+') {
+            str += 9;
+    }
+
+    if(strncmp(str, "recv", 4)){
+        return 0;
+    }else{
+        str += 5;
+    }
+    
+    conn = lwgsmi_parse_number(&str);           /* Parse number for connection number */
+    len = lwgsmi_parse_number(&str);            /* Parse number for number of bytes to read */
+
+    c = conn < LWGSM_CFG_MAX_CONNS ? &lwgsm.m.conns[conn] : NULL;   /* Get connection handle */
+    if (c == NULL) {                            /* Invalid connection number */
+        return 0;
+    }
+
+    while(*str != '\n'){                        /* Ignore the  */
+        ++str;
+    }
+
+    lwgsm.m.ipd.read = 1;                       /* Start reading network data */
+    lwgsm.m.ipd.tot_len = len;                  /* Total number of bytes in this received packet */
+    lwgsm.m.ipd.rem_len = len;                  /* Number of remaining bytes to read */
+    lwgsm.m.ipd.conn = c;                       /* Pointer to connection we have data for */
+
+    return 1;
 }
 #endif
