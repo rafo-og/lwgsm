@@ -1,4 +1,5 @@
 #include "sim_manager.h"
+#include "lwgsm/lwgsm_mem.h"
 
 /**
  * \brief           SIM card pin code
@@ -29,42 +30,51 @@ configure_sim_card(void) {
 }
 
 /**
- * \brief   Print SIM state
+ * \brief   Report SIM card state
  * \param[in]   evt: The event received from stack
+ * \param[in]   out: Pointer to string report
  * \return          `1` on success, `0` otherwise
  */
 uint8_t
-process_sim_evt(lwgsm_evt_t* evt){
+process_sim_evt(lwgsm_evt_t* evt, char** out)
+{
+    char* body;
+    size_t report_len;
+
     if(evt->type != LWGSM_EVT_SIM_STATE_CHANGED){
         return 0;
     }
 
     switch(evt->evt.cpin.state){
         case LWGSM_SIM_STATE_NOT_INSERTED:
-            printf("SIM state: LWGSM_SIM_STATE_NOT_INSERTED.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_NOT_INSERTED. ";
         break;
         case LWGSM_SIM_STATE_READY:
-            printf("SIM state: LWGSM_SIM_STATE_READY.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_READY. ";
         break;
         case LWGSM_SIM_STATE_NOT_READY:
-            printf("SIM state: LWGSM_SIM_STATE_NOT_READY.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_NOT_READY. ";
         break;
         case LWGSM_SIM_STATE_PIN:
-            printf("SIM state: LWGSM_SIM_STATE_PIN.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_PIN. ";
         break;
         case LWGSM_SIM_STATE_PUK:
-            printf("SIM state: LWGSM_SIM_STATE_PUK.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_PUK. ";
         break;
         case LWGSM_SIM_STATE_PH_PIN:
-            printf("SIM state: LWGSM_SIM_STATE_PH_PIN.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_PH_PIN. ";
         break;
         case LWGSM_SIM_STATE_PH_PUK:
-            printf("SIM state: LWGSM_SIM_STATE_PH_PUK.\r\n");
+            body = "SIM state: LWGSM_SIM_STATE_PH_PUK. ";
         break;
         default:
-            printf("SIM state: UNKNOWN.\r\n");
+            body = "SIM state: UNKNOWN. ";
         break;
     }
+
+    report_len = snprintf(NULL, 0, body);
+    *out = lwgsm_mem_malloc(report_len);
+    snprintf(*out, report_len, body);
 
     return 1;
 }

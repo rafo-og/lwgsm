@@ -2476,6 +2476,12 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         }
 #endif /* LWGSM_CFG_USSD */
 #if LWGSM_SIM7080
+        case LWGSM_CMD_AT: {                    /* Check AT port */
+            /* Send manual AT command */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_END_AT();
+            break;
+        }
         case LWGSM_CMD_CGATT_GET:{              /* Check PS service. 1 indicates PS has attached. */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CGATT?");

@@ -153,7 +153,14 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
 #if LWGSM_CFG_RESET_ON_INIT
     if (lwgsm.status.f.dev_present) {
         lwgsm_core_unlock();
+#if !LWGSM_SIM7080
         res = lwgsm_reset_with_delay(LWGSM_CFG_RESET_DELAY_DEFAULT, NULL, NULL, blocking);  /* Send reset sequence with delay */
+#else
+        do{
+            res = lwgsm_check_at(blocking);
+        }while(res != lwgsmOK);
+        res = lwgsm_reset(NULL, NULL, blocking);    /* Send reset sequence without delay */
+#endif
         lwgsm_core_lock();
     }
 #else /* LWGSM_CFG_RESET_ON_INIT */
@@ -269,6 +276,21 @@ lwgsm_reset_with_delay(uint32_t delay,
     LWGSM_MSG_VAR_REF(msg).msg.reset.delay = delay;
 
     return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 60000);
+}
+
+/**
+ * \brief           Check AT response
+ * \param[in]       blocking: Status whether command should be blocking or not
+ * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t enumeration otherwise
+ */
+lwgsmr_t
+lwgsm_check_at(const uint32_t blocking) {
+    LWGSM_MSG_VAR_DEFINE(msg);
+
+    LWGSM_MSG_VAR_ALLOC(msg, blocking);
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_AT;
+
+    return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 500);
 }
 
 /**

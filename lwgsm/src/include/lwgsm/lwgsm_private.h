@@ -253,6 +253,7 @@ typedef enum {
 
 #if LWGSM_SIM7080
     /* SIM7080 additional AT commands*/
+    LWGSM_CMD_AT,                               /*!< Check AT port */
     LWGSM_CMD_CGATT_GET,                        /*!< Check PS Service */
     LWGSM_CMD_CGNAPN,                           /*!< Get APN */
     LWGSM_CMD_CNCFG,                            /*!< PDP configure */

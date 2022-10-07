@@ -9,7 +9,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 uint8_t     configure_sim_card(void);
-uint8_t     process_sim_evt(lwgsm_evt_t* evt);
+uint8_t     process_sim_evt(lwgsm_evt_t* evt, char** out);
 
 #ifdef __cplusplus
 }
