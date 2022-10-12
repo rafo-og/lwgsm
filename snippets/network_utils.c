@@ -32,6 +32,9 @@ network_utils_process_reg_change(lwgsm_evt_t* evt, char** out) {
         case LWGSM_NETWORK_REG_STATUS_CONNECTED_ROAMING:
             body = "Connected to network and roaming.\0";
             break;
+        case LWGSM_NETWORK_REG_STATUS_DENIED:
+            body = "Connection denied.\0";
+            break;
         case LWGSM_NETWORK_REG_STATUS_SEARCHING:
             body = "Searching for network.\0";
             break;

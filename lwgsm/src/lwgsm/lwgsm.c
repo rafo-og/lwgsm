@@ -71,7 +71,7 @@ def_callback(lwgsm_evt_t* evt) {
 lwgsmr_t
 lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
     lwgsmr_t res = lwgsmOK;
-
+    
     lwgsm.status.f.initialized = 0;             /* Clear possible init flag */
     lwgsm.status.f.runningProduce = 0;          /* Clear possible running flag */
     lwgsm.status.f.runningProcess = 0;          /* Clear possible running flag */

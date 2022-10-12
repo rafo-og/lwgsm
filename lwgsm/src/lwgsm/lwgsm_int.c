@@ -2539,11 +2539,10 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             lwgsmi_send_number(msg->msg.pdp_context.idx, 0, 0);
             lwgsmi_send_string(msg->msg.pdp_context.pdp_type, 0, 1, 1);
             lwgsmi_send_string(msg->msg.pdp_context.apn, 0, 1, 1);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.d_comp), 0, msg->msg.pdp_context.d_comp
-                                    || msg->msg.pdp_context.h_comp || msg->msg.pdp_context.ipv4_ctrl);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.h_comp), 0, msg->msg.pdp_context.h_comp
-                                    || msg->msg.pdp_context.ipv4_ctrl);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.ipv4_ctrl) ? 1 : 0, 0, msg->msg.pdp_context.ipv4_ctrl ? 1 : 0);
+            lwgsmi_send_ip_mac(msg->msg.pdp_context.pdp_addr, 1, 1, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.d_comp), 0, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.h_comp), 0, 1);
+            lwgsmi_send_number(LWGSM_U32(msg->msg.pdp_context.ipv4_ctrl) ? 1 : 0, 0, 1);
             AT_PORT_SEND_END_AT();
             break;
         }

@@ -71,5 +71,7 @@ lwgsmr_t operator_utils_print_scan(lwgsm_evt_t* evt){
         printf("\t\t - Technology: %s (%d) \r\n", netact_str[evt->evt.operator_scan.ops[i].netact], evt->evt.operator_scan.ops[i].netact);
     }
 
+    printf("\r\n\r\n");
+
     return lwgsmOK;
 }
