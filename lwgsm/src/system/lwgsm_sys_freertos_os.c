@@ -126,6 +126,9 @@ lwgsm_sys_sem_delete(lwgsm_sys_sem_t* p) {
 uint32_t
 lwgsm_sys_sem_wait(lwgsm_sys_sem_t* p, uint32_t timeout) {
     uint32_t t = xTaskGetTickCount();
+
+    timeout = timeout / portTICK_PERIOD_MS;
+    
     return xSemaphoreTake(*p, !timeout ? portMAX_DELAY : timeout) == pdPASS ? (xTaskGetTickCount() - t) : LWGSM_SYS_TIMEOUT;
 }
 
@@ -174,6 +177,8 @@ uint32_t
 lwgsm_sys_mbox_get(lwgsm_sys_mbox_t* b, void** m, uint32_t timeout) {
     freertos_mbox mb;
     uint32_t t = xTaskGetTickCount();
+
+    timeout = timeout / portTICK_PERIOD_MS;
 
     if (xQueueReceive(*b, &mb, !timeout ? portMAX_DELAY : timeout)) {
         *m = mb.d;

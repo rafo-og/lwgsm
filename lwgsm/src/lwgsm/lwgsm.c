@@ -340,15 +340,12 @@ lwgsm_core_unlock(void) {
 uint8_t
 lwgsm_delay(uint32_t ms) {
     lwgsm_sys_sem_t sem;
-    uint32_t ticks;
 
-    ticks = ms/portTICK_PERIOD_MS;
-
-    if (ticks == 0) {
+    if (ms == 0) {
         return 1;
     }
     if (lwgsm_sys_sem_create(&sem, 0)) {
-        lwgsm_sys_sem_wait(&sem, ticks);
+        lwgsm_sys_sem_wait(&sem, ms);
         lwgsm_sys_sem_release(&sem);
         lwgsm_sys_sem_delete(&sem);
         return 1;
