@@ -138,7 +138,7 @@
  * \note            When GSM sends buffer buffer than maximal, multiple buffers are created
  */
 #ifndef LWGSM_CFG_IPD_MAX_BUFF_SIZE
-#define LWGSM_CFG_IPD_MAX_BUFF_SIZE           1460
+#define LWGSM_CFG_IPD_MAX_BUFF_SIZE           2048
 #endif
 
 /**
@@ -458,7 +458,7 @@
  * Defines maximal number of pbuf data packet references for receive
  */
 #ifndef LWGSM_CFG_NETCONN_RECEIVE_QUEUE_LEN
-#define LWGSM_CFG_NETCONN_RECEIVE_QUEUE_LEN   8
+#define LWGSM_CFG_NETCONN_RECEIVE_QUEUE_LEN   20
 #endif
 
 /**

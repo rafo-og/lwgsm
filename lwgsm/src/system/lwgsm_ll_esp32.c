@@ -63,6 +63,14 @@
 #define LWGSM_UART_QUEUE_SIZE       10
 #endif /* !defined(LWGSM_UART_QUEUE_SIZE) */
 
+#if !defined(LWGSM_PROCESS_QUEUE_SIZE)
+#define LWGSM_PROCESS_QUEUE_SIZE       50
+#endif /* !defined(LWGSM_PROCESS_QUEUE_SIZE) */
+
+#if !defined(LWGSM_PROCESS_QUEUE_TIMEOUT_MS)
+#define LWGSM_PROCESS_QUEUE_TIMEOUT_MS       10000
+#endif /* !defined(LWGSM_PROCESS_QUEUE_SIZE) */
+
 #if !defined(LWGSM_UART_DEBUG_LEVEL)
 #define LWGSM_UART_DEBUG_LEVEL      ESP_LOG_INFO
 #endif /* !defined(LWGSM_UART_DEBUG_LEVEL) */
@@ -79,23 +87,33 @@
 #define LWGSM_RESET_PIN_MASK_BIT    (1ULL << LWGSM_RESET_PIN)
 #endif
 
-#define USART_THREAD_PRIORITY       configMAX_PRIORITIES/2
+#define USART_THREAD_PRIORITY       ( tskIDLE_PRIORITY + 5 )
 #define USART_QUEUE_TIMEOUT         (portTickType) 5000/portTICK_PERIOD_MS
 
+#if !defined(LWGSM_READING_THREAD_STACK_SIZE)
 #define LWGSM_READING_THREAD_STACK_SIZE         4096
+#endif /*LWGSM_READING_THREAD_STACK_SIZE*/
 
 #if !LWGSM_CFG_MEM_CUSTOM
 static uint8_t memory[0x10000];             /* Create memory for dynamic allocations with specific size */
 #endif
+
+typedef struct ReadDataBlock{
+    uint8_t* packet;
+    size_t packetLength;
+}ReadDataBlock_t;
+
 static uint8_t is_running, initialized;
 static const char *TAG = "LWGSM_UART";
 
 /* USART thread */
 static void usart_ll_thread(void* arg);
 static TaskHandle_t usart_ll_thread_id;
+static TaskHandle_t process_data_thread_id;
 
 /* Events queue */
 static QueueHandle_t uart_event_ll_mbox_id;
+static QueueHandle_t data_to_process_queue_id;
 
 /* Hardware reset function */
 #if defined(LWGSM_RESET_PIN)
@@ -103,13 +121,13 @@ static uint8_t reset_device(uint8_t state);
 #endif
 
 /**
- * \brief           USART data processing
+ * \brief USART receive data
  */
 static void usart_ll_thread(void* arg)
 {
     uart_event_t event;
     uart_event_t* eventPtr = &event;
-    uint8_t* dtmp = (uint8_t*) malloc(LWGSM_UART_RX_BUF_SIZE);
+    ReadDataBlock_t dataBlock;
 
     // To avoid non-used warning
     (void)(arg);
@@ -119,23 +137,16 @@ static void usart_ll_thread(void* arg)
     while(lwgsm.status.f.runningLLThread){
         //Waiting for UART event.
         if(xQueueReceive(uart_event_ll_mbox_id, (void *) eventPtr, USART_QUEUE_TIMEOUT) == pdPASS){
-            bzero(dtmp, LWGSM_UART_RX_BUF_SIZE);
             switch(event.type) {
                 //Event of UART receving data
                 /*We'd better handler data event fast, there would be much more data events than
                 other types of events. If we take too much time on data event, the queue might
                 be full.*/
                 case UART_DATA:
-                    uart_read_bytes(LWGSM_UART_NUM, dtmp, event.size, portMAX_DELAY);
-#if LWGSM_CFG_DBG_LL_RECV
-                    printf("[DATA EVT]:");
-                    for(int i=0; i<event.size; i++){
-                        printf("%c", *(dtmp + i));
-                    }
-                    printf("\r\n");
-#endif /* LWGSM_CFG_DBG_LL_RECV */
-                    lwgsm_input_process(dtmp, event.size);
-                    // lwgsm_input(dtmp, event.size);
+                    dataBlock.packet = pvPortMalloc(event.size);
+                    dataBlock.packetLength = event.size;
+                    uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, portMAX_DELAY);  
+                    xQueueSend(data_to_process_queue_id, &dataBlock, LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS);
                     break;
                 //Others
                 default:
@@ -147,11 +158,45 @@ static void usart_ll_thread(void* arg)
     }
     
     LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "[UART THREAD] Thread exit");
-    free(dtmp);
-    dtmp = NULL;
     lwgsm_sys_sem_release(&lwgsm.sem_end_sync);
     usart_ll_thread_id = NULL;
     lwgsm_sys_thread_terminate(&usart_ll_thread_id);
+}
+
+/**
+ * @brief Process data received
+ * 
+ * @param arg 
+ */
+static void process_data_thread(void* arg)
+{
+    ReadDataBlock_t dataBlock;
+
+    while(lwgsm.status.f.runningLLThread){
+        if(xQueueReceive(data_to_process_queue_id, &dataBlock, 
+                    LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS) == pdPASS){
+            #if LWGSM_CFG_DBG_LL_RECV
+            printf("[DATA EVT]:");
+            for(int i=0; i<dataBlock.packetLength; i++){
+                printf("%c", *(dataBlock.packet + i));
+            }
+            printf("\r\n");
+            #endif /* LWGSM_CFG_DBG_LL_RECV */   
+            lwgsm_input_process(dataBlock.packet, dataBlock.packetLength);
+            vPortFree(dataBlock.packet);
+        }
+    }
+    
+    /* Deallocate the remaining data blocks in queue if they exists */
+    while(uxQueueMessagesWaiting(data_to_process_queue_id) != 0){
+        if(xQueueReceive(data_to_process_queue_id, &dataBlock, 
+                    LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS) == pdPASS){
+            vPortFree(dataBlock.packet);
+        }
+    }
+
+    vQueueDelete(data_to_process_queue_id);
+    vTaskDelete(NULL);
 }
 
 /**
@@ -202,11 +247,25 @@ static void configure_uart(uint32_t baudrate)
         }
     }
 
+    // Create queue to process received data
+    if(data_to_process_queue_id == NULL){
+        data_to_process_queue_id = xQueueCreate(LWGSM_PROCESS_QUEUE_SIZE, sizeof(ReadDataBlock_t));
+        assert(data_to_process_queue_id != NULL);
+    }
+
     // Create thread to read the incoming data from UART
     if (usart_ll_thread_id == NULL) {
-        xTaskCreate(usart_ll_thread, "LwGSM UART reading thread", LWGSM_READING_THREAD_STACK_SIZE, NULL, USART_THREAD_PRIORITY, &usart_ll_thread_id);
+        xTaskCreate(usart_ll_thread, "LwGSM UART reading", LWGSM_READING_THREAD_STACK_SIZE, NULL,
+                    USART_THREAD_PRIORITY, &usart_ll_thread_id);
         configASSERT(usart_ll_thread_id != NULL);
     }
+
+    if(process_data_thread_id == NULL){
+        xTaskCreate(process_data_thread, "LwGSM process received data", LWGSM_READING_THREAD_STACK_SIZE, NULL,
+                    USART_THREAD_PRIORITY, &process_data_thread_id);
+        configASSERT(process_data_thread_id != NULL);
+    }
+
 }
 
 /**
