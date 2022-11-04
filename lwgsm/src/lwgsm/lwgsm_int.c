@@ -1684,7 +1684,7 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
             case 2:
                 SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CNACT_SET_1);
                 break;
-#endif
+#endif /* !LWGSM_SIM7080 */
             default:
                 break;
         }
@@ -1698,7 +1698,11 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 break;
 #if LWGSM_CFG_CONN
             case 2:
+#if !LWGSM_SIM7080
                 SET_NEW_CMD(LWGSM_CMD_CIPSTATUS);
+#else
+                SET_NEW_CMD(LWGSM_CMD_CGATT_GET);
+#endif /* !LWGSM_SIM7080 */
                 break;
 #endif /* LWGSM_CFG_CONN */
             default:
