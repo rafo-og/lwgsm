@@ -1,11 +1,12 @@
 #include "sim_manager.h"
 #include "lwgsm/lwgsm_mem.h"
+#include "lwgsm_provision.h"
 
 /**
  * \brief           SIM card pin code
  */
 static const char*
-pin_code = "5873";
+pin_code = "1234";
 
 /**
  * \brief           SIM card puk code
@@ -19,13 +20,27 @@ puk_code = "12926752";
  */
 uint8_t
 configure_sim_card(void) {
+
+    lwgsmr_t ret;
+    char* pin_code;
+
+    LWGSM_UNUSED(pin_code);
     LWGSM_UNUSED(puk_code);
+
+    ret = lwgsm_provision_get_pin_code(&pin_code);
+    if(ret != ESP_OK){
+        return 0;
+    }
+
     if (pin_code != NULL && strlen(pin_code)) {
         if (lwgsm_sim_pin_enter(pin_code, NULL, NULL, 1) == lwgsmOK) {
+            lwgsm_mem_free(pin_code);
             return 1;
         }
         return 0;
     }
+    
+    lwgsm_mem_free(pin_code);
     return 1;
 }
 
