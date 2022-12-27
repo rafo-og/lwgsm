@@ -1170,14 +1170,9 @@ lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error)
             /* Set status */
             lwgsm.msg->msg.conn_start.conn_res = LWGSM_CONN_CONNECT_OK;
         }else{
+            conn->status.f.active = 0;
             lwgsm.msg->msg.conn_start.conn_res = LWGSM_CONN_CONNECT_ERROR;
             *is_error = 1;
-        }
-
-        if(conn_state != 0){
-            conn->status.f.active = 0;
-        }else{
-            conn->status.f.active = 1;
         }
 
         lwgsm.msg->res = lwgsmERRCONNFAIL;

@@ -2617,7 +2617,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CSSLCFG=");
             lwgsmi_send_string("SSLVERSION", 0, 1, 0);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 1);
             lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.ssl_ver), 0, 1);
             AT_PORT_SEND_END_AT();
             break;
@@ -2626,8 +2626,8 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CSSLCFG=");
             lwgsmi_send_string("CIPHERSUITE", 0, 1, 0);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 1);
             lwgsmi_send_hex_number(LWGSM_U32(msg->msg.conn_start.ssl_cypher), 4, 1, 0, 1);
             AT_PORT_SEND_END_AT();
             break;
@@ -2636,7 +2636,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CSSLCFG=");
             lwgsmi_send_string("SNI", 0, 1, 0);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 1);
             lwgsmi_send_string(msg->msg.conn_start.host, 0, 1 ,1);
             AT_PORT_SEND_END_AT();
             break;
@@ -2664,7 +2664,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         case LWGSM_CMD_CASSLCFG_SSL_SET_1:{     /* Enable SSL/TLS */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CASSLCFG=");
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 0);
             lwgsmi_send_string("SSL", 0, 1, 1);
             lwgsmi_send_number(1, 0, 1);
             AT_PORT_SEND_END_AT();
@@ -2673,16 +2673,16 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         case LWGSM_CMD_CASSLCFG_CRINDEX:{       /* Enable SSL/TLS */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CASSLCFG=");
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 0);
             lwgsmi_send_string("CRINDEX", 0, 1, 1);
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 1);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 1);
             AT_PORT_SEND_END_AT();
             break;
         }
         case LWGSM_CMD_CASSLCFG_SET_CAROOT:{    /* Set root certificate */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CASSLCFG=");
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 0);
             lwgsmi_send_string("CACERT", 0, 1, 1);
             lwgsmi_send_string(CA_ROOT_LABEL, 0, 1, 1);
             AT_PORT_SEND_END_AT();
@@ -2691,7 +2691,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         case LWGSM_CMD_CASSLCFG_SET_CLIENTCERT:{/* Set up client certificate */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CASSLCFG=");
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 0);
             lwgsmi_send_string("CERT", 0, 1, 1);
             lwgsmi_send_string(CLIENT_CERT_LABEL, 0, 1, 1);
             AT_PORT_SEND_END_AT();
@@ -2701,7 +2701,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
         case LWGSM_CMD_CAOPEN:{                 /* Open a TCP/UDP Connection */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CAOPEN=");
-            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.num), 0, 0);
+            lwgsmi_send_number(LWGSM_U32((*msg->msg.conn_start.conn)->num), 0, 0);
             lwgsmi_send_number(0, 0, 1);
             switch(msg->msg.conn_start.type){
                 case LWGSM_CONN_TYPE_UDP:
