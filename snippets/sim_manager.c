@@ -5,14 +5,14 @@
 /**
  * \brief           SIM card pin code
  */
-static const char*
-pin_code = "1234";
+// static const char*
+// pin_code = "1234";
 
 /**
  * \brief           SIM card puk code
  */
-static const char*
-puk_code = "12926752";
+// static const char*
+// puk_code = "12926752";
 
 /**
  * \brief           Configure and enable SIM card
@@ -23,9 +23,6 @@ configure_sim_card(void) {
 
     lwgsmr_t ret;
     char* pin_code;
-
-    LWGSM_UNUSED(pin_code);
-    LWGSM_UNUSED(puk_code);
 
     ret = lwgsm_provision_get_pin_code(&pin_code);
     if(ret != ESP_OK){
