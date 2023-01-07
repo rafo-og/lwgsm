@@ -509,7 +509,6 @@ lwgsm_netconn_close(lwgsm_netconn_p nc) {
 
     lwgsm_conn_set_arg(conn, NULL);             /* Reset argument */
     lwgsm_conn_close(conn, 1);                  /* Close the connection */
-    flush_mboxes(nc, 1);                        /* Flush message queues */
     return lwgsmOK;
 }
 
