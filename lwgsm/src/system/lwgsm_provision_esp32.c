@@ -25,7 +25,7 @@
 lwgsmr_t lwgsm_provision_get_pin_code(char** pin_code)
 {
     esp_err_t ret;
-    ret = awsProvision_GetPinCode(pin_code);
+    ret = aws_prov_get_pin_code(pin_code);
 
     if(ret == ESP_OK){
         return lwgsmOK;
