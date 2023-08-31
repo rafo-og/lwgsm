@@ -96,7 +96,7 @@
 
 #if !LWGSM_CFG_MEM_CUSTOM
 static uint8_t memory[0x10000];             /* Create memory for dynamic allocations with specific size */
-#endif
+#endif /*!LWGSM_CFG_MEM_CUSTOM*/
 
 typedef struct ReadDataBlock{
     uint8_t* packet;
@@ -118,7 +118,7 @@ static QueueHandle_t data_to_process_queue_id;
 /* Hardware reset function */
 #if defined(LWGSM_RESET_PIN)
 static uint8_t reset_device(uint8_t state);
-#endif
+#endif /*defined(LWGSM_RESET_PIN)*/
 
 /**
  * \brief USART receive data
@@ -414,3 +414,28 @@ static uint8_t reset_device(uint8_t state)
     return 1;
 }
 #endif /* defined(LWGSM_RESET_PIN) */
+
+
+#if LWGSM_CFG_MEM_CUSTOM
+
+void* lwgsm_mem_malloc(size_t size)
+{
+    return malloc(size);
+}
+
+void* lwgsm_mem_realloc(void* ptr, size_t size)
+{
+    return realloc(ptr, size);
+}
+
+void* lwgsm_mem_calloc(size_t num, size_t size)
+{
+    return calloc(num, size);
+}
+
+void lwgsm_mem_free(void* ptr)
+{
+    free(ptr);
+}
+
+#endif /*LWGSM_CFG_MEM_CUSTOM*/
