@@ -61,7 +61,7 @@ lwgsm_thread_produce(void* const arg) {
     while (lwgsm.status.f.runningProduce) {
         lwgsm_core_unlock();
         do {
-            time = lwgsm_sys_mbox_get(&e->mbox_producer, (void**)&msg, 5000/portTICK_PERIOD_MS);  /* Get message from queue */
+            time = lwgsm_sys_mbox_get(&e->mbox_producer, (void**)&msg, 1000);  /* Get message from queue */
         } while ((time == LWGSM_SYS_TIMEOUT || msg == NULL) && lwgsm.status.f.runningProduce);
 
         if(!lwgsm.status.f.runningProduce){
@@ -229,7 +229,7 @@ lwgsm_thread_process(void* const arg) {
          * If there are no timeouts to process, we can wait unlimited time.
          * In case new timeout occurs, thread will wake up by writing new element to mbox process queue
          */
-        time = lwgsmi_get_from_mbox_with_timeout_checks(&e->mbox_process, (void**)&msg, 5000/portTICK_PERIOD_MS);
+        time = lwgsmi_get_from_mbox_with_timeout_checks(&e->mbox_process, (void**)&msg, 5000);
 
         if(!lwgsm.status.f.runningProcess){
             break;

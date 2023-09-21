@@ -158,8 +158,9 @@ static void usart_ll_thread(void* arg)
     }
     
     LWGSM_DEBUGF(LWGSM_CFG_DBG_THREAD | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "[UART THREAD] Thread exit");
-    lwgsm_sys_sem_release(&lwgsm.sem_end_sync);
     usart_ll_thread_id = NULL;
+    //vQueueDelete(uart_event_ll_mbox_id);
+    lwgsm_sys_sem_release(&lwgsm.sem_end_sync);
     lwgsm_sys_thread_terminate(&usart_ll_thread_id);
 }
 
@@ -196,7 +197,8 @@ static void process_data_thread(void* arg)
     }
 
     vQueueDelete(data_to_process_queue_id);
-    vTaskDelete(NULL);
+    process_data_thread_id = NULL;
+    lwgsm_sys_thread_terminate(&process_data_thread_id);
 }
 
 /**
@@ -383,14 +385,16 @@ lwgsmr_t lwgsm_ll_deinit(lwgsm_ll_t* ll)
         uart_event_t event;
         uart_event_t* eventPtr = &event;
         /* Empty queue if there are messages */
-        while(lwgsm_sys_mbox_get(&uart_event_ll_mbox_id, (void **)&eventPtr, 10/portTICK_PERIOD_MS) != LWGSM_SYS_TIMEOUT);
-        lwgsm_sys_mbox_delete(&uart_event_ll_mbox_id);
-        uart_event_ll_mbox_id = NULL;
+        while(lwgsm_sys_mbox_get(&uart_event_ll_mbox_id, (void **)&eventPtr, 10) != LWGSM_SYS_TIMEOUT);
+        //lwgsm_sys_mbox_delete(&uart_event_ll_mbox_id); // Think it is deleted in the driver delete Todo
+        //uart_event_ll_mbox_id = NULL;
     }
     if(uart_is_driver_installed(LWGSM_UART_NUM)){
         ret = uart_driver_delete(LWGSM_UART_NUM);
         ESP_ERROR_CHECK(ret);
     }
+
+    uart_event_ll_mbox_id = NULL;
     initialized = 0;
     
     return lwgsmOK;

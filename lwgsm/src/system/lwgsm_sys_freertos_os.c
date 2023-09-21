@@ -170,7 +170,7 @@ lwgsm_sys_mbox_put(lwgsm_sys_mbox_t* b, void* m) {
 
     mb.d = m;
     xQueueSend(*b, &mb, portMAX_DELAY);
-    return xTaskGetTickCount() - t;
+    return (xTaskGetTickCount() - t) * portTICK_PERIOD_MS;
 }
 
 uint32_t
@@ -182,7 +182,7 @@ lwgsm_sys_mbox_get(lwgsm_sys_mbox_t* b, void** m, uint32_t timeout) {
 
     if (xQueueReceive(*b, &mb, !timeout ? portMAX_DELAY : timeout)) {
         *m = mb.d;
-        return xTaskGetTickCount() - t;
+        return (xTaskGetTickCount() - t) * portTICK_PERIOD_MS;
     }
     return LWGSM_SYS_TIMEOUT;
 }

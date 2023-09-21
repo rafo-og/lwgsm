@@ -199,22 +199,22 @@ lwgsm_deinit(void){
     
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
         "[CORE] Deinitializing LWGSM library");
-
+        
     /* Terminate threads */
     lwgsm.status.f.runningLLThread = 0;          /* Clear produce thread running flag */
     lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
     lwgsm_ll_deinit(&lwgsm.ll);
 
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
-        "[CORE] Low-Level thread terminated");
+         "[CORE] Low-Level thread terminated");
     lwgsm.status.f.runningProduce = 0;          /* Clear produce thread running flag */
     lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
-        "[CORE] Produce thread terminated");
-    lwgsm.status.f.runningProcess = 0;          /* Clear produce thread running flag */
+         "[CORE] Produce thread terminated");
+    lwgsm.status.f.runningProcess = 0;          /* Clear process thread running flag */
     lwgsm_sys_sem_wait(&lwgsm.sem_end_sync, portMAX_DELAY);
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
-        "[CORE] Process thread terminated");
+         "[CORE] Process thread terminated");
 
     /* Remove all queues and semaphores */
     lwgsm_sys_mbox_delete(&lwgsm.mbox_producer);
@@ -230,12 +230,12 @@ lwgsm_deinit(void){
     lwgsm_sys_sem_invalid(&lwgsm.sem_end_sync);
 
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
-        "[CORE] Core logic terminated");
+         "[CORE] Core logic terminated");
 
     lwgsm_sys_deinit();                         /* DeInit low-level system */
 
     LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
-        "[CORE] Library terminated.");
+         "[CORE] Library terminated.");
 
     lwgsm.status.f.initialized = 0;             /* Clear possible init flag */
 
