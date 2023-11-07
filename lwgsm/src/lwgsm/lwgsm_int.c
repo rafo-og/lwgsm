@@ -1418,12 +1418,15 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
             }
             case LWGSM_CMD_ATE0:
             case LWGSM_CMD_ATE1:
+                SET_NEW_CMD(LWGSM_CMD_CGNSPWR_OFF);
+                break;                          
+            case LWGSM_CMD_CGNSPWR_OFF:         /* Power off GNSS */
                 SET_NEW_CMD(LWGSM_CMD_CFUN_SET);
-                break;                          /* Set full functionality */
-            case LWGSM_CMD_CFUN_SET:
+                break;
+            case LWGSM_CMD_CFUN_SET:             /* Set full functionality */
                 SET_NEW_CMD(LWGSM_CMD_CMEE_SET);
-                break;                          /* Set detailed error reporting */
-            case LWGSM_CMD_CMEE_SET:
+                break;
+            case LWGSM_CMD_CMEE_SET:            /* Set detailed error reporting */
                 SET_NEW_CMD(LWGSM_CMD_CGMI_GET);
                 break;                          /* Get manufacturer */
             case LWGSM_CMD_CGMI_GET:
@@ -1928,12 +1931,12 @@ lwgsmr_t
 lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
     switch (CMD_GET_CUR()) {                    /* Check current message we want to send over AT */
         case LWGSM_CMD_RESET: {                 /* Reset modem with AT commands */
-            /* Try with hardware reset */
-            if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
-                lwgsm_delay(2);
-                lwgsm.ll.reset_fn(0);
-                lwgsm_delay(500);
-            }
+            // /* Try with hardware reset */
+            // if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
+            //     lwgsm_delay(1000);
+            //     lwgsm.ll.reset_fn(0);
+            //     lwgsm_delay(1000);
+            // }
 
             /* Send manual AT command */
             AT_PORT_SEND_BEGIN_AT();
@@ -2698,6 +2701,7 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             break;
         }
 #endif
+        /* TCP/UDP AT commands */
         case LWGSM_CMD_CAOPEN:{                 /* Open a TCP/UDP Connection */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CAOPEN=");
@@ -2733,6 +2737,13 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CACLOSE=");
             lwgsmi_send_number(LWGSM_U32(msg->msg.conn_close.conn ? msg->msg.conn_close.conn->num : LWGSM_CFG_MAX_CONNS), 0, 0);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        /* GNSS AT commands */
+        case LWGSM_CMD_CGNSPWR_OFF:{            /* GNSS power control */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CGNSPWR=0");
             AT_PORT_SEND_END_AT();
             break;
         }
