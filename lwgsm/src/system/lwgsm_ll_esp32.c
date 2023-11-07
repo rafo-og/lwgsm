@@ -148,6 +148,9 @@ static void usart_ll_thread(void* arg)
                     uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, portMAX_DELAY);  
                     xQueueSend(data_to_process_queue_id, &dataBlock, LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS);
                     break;
+                case UART_BREAK:
+                    /* This event ocurrs when the GSM module is reset by hardware */
+                    break;
                 //Others
                 default:
                     ESP_LOGW(TAG, "uart event not captured type: %d", event.type);
@@ -283,7 +286,7 @@ static size_t send_data(const void* data, size_t len)
 #if LWGSM_CFG_DBG_LL_SEND
     int i = 0;
     if(len > 0){
-        printf("Sending data (%d bytes):", len);
+        printf("=> (%d bytes):", len);
         while(len > i){
             printf("%c", *((const char*)data + i));
             i++;
@@ -409,10 +412,10 @@ static uint8_t reset_device(uint8_t state)
     esp_err_t ret;
 
     if (state) {                                /* Activate reset line */
-        ret = gpio_set_level(LWGSM_RESET_PIN, 0);
+        ret = gpio_set_level(LWGSM_RESET_PIN, 1);
         ESP_ERROR_CHECK(ret);
     } else {
-        ret = gpio_set_level(LWGSM_RESET_PIN, 1);
+        ret = gpio_set_level(LWGSM_RESET_PIN, 0);
         ESP_ERROR_CHECK(ret);
     }
     return 1;
