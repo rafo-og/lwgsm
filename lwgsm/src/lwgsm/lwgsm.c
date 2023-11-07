@@ -156,6 +156,12 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
 #if !LWGSM_SIM7080
         res = lwgsm_reset_with_delay(LWGSM_CFG_RESET_DELAY_DEFAULT, NULL, NULL, blocking);  /* Send reset sequence with delay */
 #else
+        /* Try with hardware reset */
+        if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
+            lwgsm_delay(1000);
+            lwgsm.ll.reset_fn(0);
+            lwgsm_delay(LWGSM_CFG_WAIT_AFTER_RESET);
+        }
         do{
             res = lwgsm_check_at(blocking);
         }while(res != lwgsmOK);

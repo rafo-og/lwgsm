@@ -276,10 +276,12 @@ typedef enum {
     LWGSM_CMD_CASSLCFG_CRINDEX,                 /*!< Set ID corresponding to SSL configuration */
     LWGSM_CMD_CASSLCFG_SET_CAROOT,              /*!< Set root certificate */
     LWGSM_CMD_CASSLCFG_SET_CLIENTCERT,          /*!< Set up client certificate */
-    /* TCP/UDP commands */
+    /* TCP/UDP AT commands */
     LWGSM_CMD_CAOPEN,                           /*!< Open a TCP/UDP Connection */
     LWGSM_CMD_CACLOSE,                          /*!< Close a TCP/UDP Connection */
     LWGSM_CMD_CASEND,                           /*!< Send Data via an Established Connection */
+    /* GNSS AT commands */
+    LWGSM_CMD_CGNSPWR_OFF,                      /*!< GNSS Power Off */
     /* AT COMMANDS SEQUENCES */
     LWGSM_CMD_DEFINE_PDP,                       /*!< Define new PDP context */
     LWGSM_CMD_CONN_START,                       /*!< Start new connection to server */
