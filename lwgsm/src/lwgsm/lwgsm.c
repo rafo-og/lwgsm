@@ -156,16 +156,8 @@ lwgsm_init(lwgsm_evt_fn evt_func, const uint32_t blocking) {
 #if !LWGSM_SIM7080
         res = lwgsm_reset_with_delay(LWGSM_CFG_RESET_DELAY_DEFAULT, NULL, NULL, blocking);  /* Send reset sequence with delay */
 #else
-        /* Try with hardware reset */
-        if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
-            lwgsm_delay(1000);
-            lwgsm.ll.reset_fn(0);
-            lwgsm_delay(LWGSM_CFG_WAIT_AFTER_RESET);
-        }
-        do{
-            res = lwgsm_check_at(blocking);
-        }while(res != lwgsmOK);
-        res = lwgsm_reset(NULL, NULL, blocking);    /* Send reset sequence without delay */
+        lwgsm_reset_hw(1000, blocking);
+        res = lwgsm_reset(NULL, NULL, blocking);
 #endif
         lwgsm_core_lock();
     }
@@ -297,6 +289,31 @@ lwgsm_check_at(const uint32_t blocking) {
     LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_AT;
 
     return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 500);
+}
+
+/**
+ * \brief           Hardware reset
+ * \param[in]       pin_delay: Time to wait while the pin is asserted
+ * \param[in]       blocking: Status whether command should be blocking or not
+ * \return          \ref lwgsmOK on success, member of \ref lwgsmr_t enumeration otherwise
+ */
+lwgsmr_t 
+lwgsm_reset_hw(const uint32_t pin_delay, const uint32_t blocking) {
+    lwgsmr_t res;
+
+    /* Try with hardware reset */
+    if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
+        lwgsm_delay(pin_delay);
+        lwgsm.ll.reset_fn(0);
+        lwgsm_delay(LWGSM_CFG_WAIT_AFTER_RESET);
+    }
+    do{
+        res = lwgsm_check_at(blocking);
+    }while(res != lwgsmOK);
+
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_INIT | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL, "HW reset complete.");
+
+    return res;
 }
 
 /**

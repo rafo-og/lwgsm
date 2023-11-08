@@ -52,6 +52,7 @@ lwgsmr_t    lwgsm_deinit(void);
 lwgsmr_t    lwgsm_reset(const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking);
 lwgsmr_t    lwgsm_reset_with_delay(uint32_t delay, const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking);
 lwgsmr_t    lwgsm_check_at(const uint32_t blocking);
+lwgsmr_t    lwgsm_reset_hw(const uint32_t pin_delay, const uint32_t blocking);
 
 lwgsmr_t    lwgsm_set_func_mode(uint8_t mode, const lwgsm_api_cmd_evt_fn evt_fn, void* const evt_arg, const uint32_t blocking);
 
