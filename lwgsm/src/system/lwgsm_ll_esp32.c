@@ -128,6 +128,7 @@ static void usart_ll_thread(void* arg)
     uart_event_t event;
     uart_event_t* eventPtr = &event;
     ReadDataBlock_t dataBlock;
+    size_t buffered_data_len;
 
     // To avoid non-used warning
     (void)(arg);
@@ -143,13 +144,19 @@ static void usart_ll_thread(void* arg)
                 other types of events. If we take too much time on data event, the queue might
                 be full.*/
                 case UART_DATA:
-                    dataBlock.packet = pvPortMalloc(event.size);
-                    dataBlock.packetLength = event.size;
-                    uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, portMAX_DELAY);  
-                    xQueueSend(data_to_process_queue_id, &dataBlock, LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS);
+                    uart_get_buffered_data_len(LWGSM_UART_NUM, (size_t*)&buffered_data_len);
+                    if(buffered_data_len > 0){
+                        dataBlock.packet = pvPortMalloc(buffered_data_len);
+                        dataBlock.packetLength = buffered_data_len;
+                        dataBlock.packetLength = uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, 20/portTICK_RATE_MS);
+                        xQueueSend(data_to_process_queue_id, &dataBlock, LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS);
+                    }
                     break;
                 case UART_BREAK:
                     /* This event ocurrs when the GSM module is reset by hardware */
+                    break;
+                case UART_FIFO_OVF:
+                    ESP_LOGE(TAG, "UART FIFO overflow. Queued messages: %d", uxQueueMessagesWaiting(data_to_process_queue_id));
                     break;
                 //Others
                 default:
@@ -418,6 +425,8 @@ static uint8_t reset_device(uint8_t state)
         ret = gpio_set_level(LWGSM_RESET_PIN, 0);
         ESP_ERROR_CHECK(ret);
     }
+    uart_flush_input(LWGSM_UART_NUM);
+    
     return 1;
 }
 #endif /* defined(LWGSM_RESET_PIN) */
