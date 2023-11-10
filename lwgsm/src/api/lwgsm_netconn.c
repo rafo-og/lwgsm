@@ -478,9 +478,15 @@ lwgsm_netconn_receive(lwgsm_netconn_p nc, lwgsm_pbuf_p* pbuf) {
      * Wait for new received data for up to specific timeout
      * or throw error for timeout notification
      */
+#if LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL
+    if (lwgsm_sys_mbox_get(&nc->mbox_receive, (void**)pbuf, 10) == LWGSM_SYS_TIMEOUT) {
+        return lwgsmTIMEOUT;
+    }
+#else
     if (lwgsm_sys_mbox_get(&nc->mbox_receive, (void**)pbuf, nc->rcv_timeout) == LWGSM_SYS_TIMEOUT) {
         return lwgsmTIMEOUT;
     }
+#endif /* LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL */
 #else /* LWGSM_CFG_NETCONN_RECEIVE_TIMEOUT */
     /* Forever wait for new receive packet */
     lwgsm_sys_mbox_get(&nc->mbox_receive, (void**)pbuf, 0);
@@ -493,6 +499,72 @@ lwgsm_netconn_receive(lwgsm_netconn_p nc, lwgsm_pbuf_p* pbuf) {
     }
     return lwgsmOK;                             /* We have data available */
 }
+
+#if LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL
+/**
+ * \brief           Receive data from connection requesting the bytes to receive
+ * \param[in]       nc: Netconn handle used to receive from
+ * \param[in]       pbuf: Pointer to pointer to save new receive buffer to.
+ * \param[in]       len: Number of bytes to receive.
+ *                     When function returns, user must check for valid pbuf value `pbuf != NULL`
+ * \return          \ref lwgsmOK when new data ready,
+ * \return          \ref lwgsmCLOSED when connection closed by remote side,
+ * \return          \ref lwgsmTIMEOUT when receive timeout occurs
+ * \return          Any other member of \ref lwgsmr_t otherwise
+ */
+lwgsmr_t
+lwgsm_netconn_receive_manual(lwgsm_netconn_p nc, lwgsm_pbuf_p* pbuf, size_t len) {
+    lwgsmr_t res;
+    size_t rlen, tlen;
+    uint32_t flag_timeout_count = 0;
+    uint32_t flag_timeout = 5000;
+    uint32_t read_timeout_count = 0;
+
+    LWGSM_ASSERT("nc != NULL", nc != NULL);
+    LWGSM_ASSERT("pbuf != NULL", pbuf != NULL);
+
+    tlen = len;
+
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_NETCONN | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+                "[NETCONN]: Waiting packet (%d ms)...\r\n", nc->rcv_timeout);
+
+    do{
+        while(!nc->conn->status.f.data_available && !nc->conn->status.f.full && !nc->conn->status.f.in_closing){
+            lwgsm_delay(10);
+            flag_timeout_count += 10;
+            if(flag_timeout_count >= flag_timeout){
+                read_timeout_count += flag_timeout_count;
+                break;
+            }
+        }
+        if(read_timeout_count >= nc->rcv_timeout){
+            break;
+        }
+        flag_timeout_count = 0;
+        if(tlen > LWGSM_SIM7080_TCP_RECV_LENGTH_MAX){
+            rlen = LWGSM_SIM7080_TCP_RECV_LENGTH_MAX;
+        }else{
+            rlen = tlen;
+        }
+        res = lwgsm_conn_recv(nc->conn, rlen, 1);
+        tlen -= nc->conn->last_recved;
+
+        if(res != lwgsmOK){
+            return lwgsmTIMEOUT;
+        }
+    } while(tlen == len && !nc->conn->status.f.in_closing);
+
+    res = lwgsm_netconn_receive(nc, pbuf);
+    LWGSM_DEBUGF(LWGSM_CFG_DBG_NETCONN | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+                "[NETCONN]: Returning... %d/%d", lwgsm_pbuf_length(*pbuf, 1), len);
+    
+    if(res == lwgsmTIMEOUT){
+        LWGSM_DEBUGF(LWGSM_CFG_DBG_NETCONN | LWGSM_DBG_TYPE_TRACE | LWGSM_DBG_LVL_ALL,
+                    "[NETCONN]: Timeout (%d)", len);
+    }
+    return res;
+}
+#endif /* LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL */
 
 /**
  * \brief           Close a netconn connection
@@ -512,8 +584,7 @@ lwgsm_netconn_close(lwgsm_netconn_p nc) {
     nc->conn = NULL;
 
     lwgsm_conn_set_arg(conn, NULL);             /* Reset argument */
-    lwgsm_conn_close(conn, 1);                  /* Close the connection */
-    return lwgsmOK;
+    return lwgsm_conn_close(conn, 1);                  /* Close the connection */
 }
 
 /**

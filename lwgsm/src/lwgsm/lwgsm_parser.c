@@ -1144,6 +1144,8 @@ lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error)
     uint8_t id;
     uint8_t conn_state;
     lwgsm_conn_t* conn;
+    char* phost;
+    uint16_t port;
 
     if (*str == '+') {
         str += 9;
@@ -1158,7 +1160,11 @@ lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error)
     
         if(conn_state == 0){
             id = conn->val_id;
+            phost = conn->remote_host;              /* Copy some values we would like to preserve */
+            port = conn->remote_port;
             LWGSM_MEMSET(conn, 0x00, sizeof(*conn));/* Reset connection parameters */
+            conn->remote_host = phost;              /* Restore the values */
+            conn->remote_port = port;
             conn->num = num;
             conn->status.f.active = 1;
             conn->val_id = ++id;    /* Set new validation ID */
@@ -1173,6 +1179,7 @@ lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error)
             conn->status.f.active = 0;
             lwgsm.msg->msg.conn_start.conn_res = LWGSM_CONN_CONNECT_ERROR;
             *is_error = 1;
+            if(conn->remote_host != NULL) { lwgsm_mem_free(conn->remote_host); }
         }
 
         lwgsm.msg->res = lwgsmERRCONNFAIL;
@@ -1232,32 +1239,206 @@ lwgsmi_parse_ipd(const char* str) {
     lwgsm_conn_p c;
 
     if (*str == '+') {
-            str += 9;
+            str += 8;
     }
 
-    if(strncmp(str, "recv", 4)){
-        return 0;
-    }else{
+    if(!strncmp(str, "recv", 4)){
         str += 5;
+        conn = lwgsmi_parse_number(&str);           /* Parse number for connection number */
+        len = lwgsmi_parse_number(&str);            /* Parse number for number of bytes to read */
+
+        c = conn < LWGSM_CFG_MAX_CONNS ? &lwgsm.m.conns[conn] : NULL;   /* Get connection handle */
+        if (c == NULL) {                            /* Invalid connection number */
+            return 0;
+        }
+
+        while(*str != '\n'){                        /* Ignore the  */
+            ++str;
+        }
+
+        lwgsm.m.ipd.read = 1;                       /* Start reading network data */
+        lwgsm.m.ipd.tot_len = len;                  /* Total number of bytes in this received packet */
+        lwgsm.m.ipd.rem_len = len;                  /* Number of remaining bytes to read */
+        lwgsm.m.ipd.conn = c;                       /* Pointer to connection we have data for */
+    }else if(!strncmp(str, "buffer full", 11)){
+        str += 12;
+        conn = lwgsmi_parse_number(&str);           /* Parse number for connection number */
+        c = conn < LWGSM_CFG_MAX_CONNS ? &lwgsm.m.conns[conn] : NULL;   /* Get connection handle */
+        if (c == NULL) {                            /* Invalid connection number */
+            return 0;
+        }
+        c->status.f.full = 1;
+    }else{
+        return 0;
     }
     
-    conn = lwgsmi_parse_number(&str);           /* Parse number for connection number */
-    len = lwgsmi_parse_number(&str);            /* Parse number for number of bytes to read */
-
-    c = conn < LWGSM_CFG_MAX_CONNS ? &lwgsm.m.conns[conn] : NULL;   /* Get connection handle */
-    if (c == NULL) {                            /* Invalid connection number */
-        return 0;
-    }
-
-    while(*str != '\n'){                        /* Ignore the  */
-        ++str;
-    }
-
-    lwgsm.m.ipd.read = 1;                       /* Start reading network data */
-    lwgsm.m.ipd.tot_len = len;                  /* Total number of bytes in this received packet */
-    lwgsm.m.ipd.rem_len = len;                  /* Number of remaining bytes to read */
-    lwgsm.m.ipd.conn = c;                       /* Pointer to connection we have data for */
 
     return 1;
 }
+
+/**
+ * \brief           Parse input string as string part of AT command without quotes
+ * \param[in,out]   src: Pointer to pointer to string to parse from
+ * \param[in]       dst: Destination pointer.
+ *                      Set to `NULL` in case you want to skip string in source
+ * \param[in]       dst_len: Length of distance buffer,
+ *                      including memory for `NULL` termination
+ * \param[in]       trim: Set to `1` to process entire string,
+ *                      even if no memory anymore
+ * \return          `1` on success, `0` otherwise
+ */
+uint8_t
+lwgsmi_parse_ip_casrip(const char** src, char* dst, size_t dst_len, uint8_t trim) {
+    const char* p = *src;
+    size_t i;
+
+    if (*p == ',') {
+        ++p;
+    }
+    i = 0;
+    if (dst_len > 0) {
+        --dst_len;
+    }
+    while (*p) {
+        if (*p == ',') {
+            ++p;
+            break;
+        }
+        if (dst != NULL) {
+            if (i < dst_len) {
+                *dst++ = *p;
+                ++i;
+            } else if (!trim) {
+                break;
+            }
+        }
+        ++p;
+    }
+    if (dst != NULL) {
+        *dst = 0;
+    }
+    *src = p;
+    return 1;
+}
+
+/**
+ * \brief           Parse CARECV statements
+ * \param[in]       str: Input string
+ * \return          `1` on success, `0` otherwise
+ */
+uint8_t
+lwgsmi_parse_carecv(const char* str, uint8_t len){
+    int8_t conn;
+    size_t data_len;
+    lwgsm_conn_p c = NULL;
+    lwgsm_conn_p j = NULL;
+    char* parsed_host;
+    const size_t parsed_host_max_len = 60;
+    lwgsm_port_t remote_port, port;
+    uint8_t ncommas = 0;
+    const char* str_test;
+
+    while(*str != '+' && len > 8){
+        ++str;
+        --len;
+    }
+    if(len < 8){
+        return 0;
+    }
+    str_test = str;
+    
+    if(strncmp(str_test, "+CARECV:", 8)){
+        return 1;
+    }else{
+        str_test += 8;
+        len -= 8;
+        if(!strncmp(str_test, " 0", 2)){
+            c = lwgsm.msg->msg.conn_recv.conn;
+            c->status.f.data_available = 0;             /* Reset data available flag */
+            c->status.f.full = 0;                       /* Reset buffer full flag */
+            c->last_recved = 0;                         /* No data received */
+            return 1;
+        }
+        while(len > 0){
+            if(*str_test == ','){
+                ncommas++;
+                if(ncommas == 3){
+                    break;
+                }
+            }
+            str_test++;
+            len--;
+        }
+        if(ncommas < 3){
+            return 0;
+        }
+    }
+
+    if (*str == '+') {
+            str += 9;
+    }
+    
+    data_len = lwgsmi_parse_number(&str);            /* Parse number for number of bytes to read */
+    if(data_len > 0){
+        parsed_host = lwgsm_mem_calloc(parsed_host_max_len, sizeof(char));
+        lwgsmi_parse_ip_casrip(&str, parsed_host, parsed_host_max_len, 1);   /* Parse IP name*/
+        remote_port = lwgsmi_parse_number(&str);    /* Parse port */
+        for(conn=LWGSM_CFG_MAX_CONNS; conn>0; conn--){
+            j = &lwgsm.m.conns[conn-1];
+            if(j != NULL){
+                if(j->remote_host == NULL){
+                    break;
+                }
+                port = lwgsm_conn_get_remote_port(j);
+                if(strlen(j->remote_host) == strlen(parsed_host)){
+                    if(!strcmp(j->remote_host, parsed_host)){
+                        if(remote_port == port){
+                            c = j;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if(parsed_host != NULL){ lwgsm_mem_free(parsed_host); }
+
+        if (c == NULL) {                            /* Invalid connection number */
+            return 1;
+        }
+
+        while(*str != ','){                        /* Advance until the next comma where the data should start  */
+            ++str;
+        }
+
+        lwgsm.m.ipd.read = 1;                       /* Start reading network data */
+        lwgsm.m.ipd.tot_len = data_len;             /* Total number of bytes in this received packet */
+        lwgsm.m.ipd.rem_len = data_len;             /* Number of remaining bytes to read */
+        lwgsm.m.ipd.conn = c;                       /* Pointer to connection we have data for */
+        c->last_recved = data_len;                  /* Return the number of bytes read */
+    }
+    return 1;
+}
+
+
+uint8_t lwgsmi_parse_dataind(const char* str){
+    
+    int32_t num;
+    lwgsm_conn_p conn;
+
+    if (*str == '+') {
+            str += 12;
+    }
+    num = lwgsmi_parse_number(&str);
+
+    conn = num < LWGSM_CFG_MAX_CONNS ? &lwgsm.m.conns[num] : NULL;   /* Get connection handle */
+    if (conn == NULL) {                            /* Invalid connection number */
+        return 0;
+    }
+    
+    conn->status.f.data_available = 1;
+
+    return 1;
+}
+
 #endif

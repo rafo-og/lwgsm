@@ -730,13 +730,15 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
 
     /* Check error response */
     if (!is_ok) {                               /* If still not ok, check if error? */
-        is_error = rcv->data[0] == '+' && !strncmp(rcv->data, "+CME ERROR", 10);/* First check +CME coded errors */
         if (!is_error) {                        /* Check basic error aswell */
             is_error = rcv->data[0] == '+' && !strncmp(rcv->data, "+CMS ERROR", 10);/* First check +CME coded errors */
             if (!is_error) {
                 is_error = !strcmp(rcv->data, "ERROR" CRLF) || !strcmp(rcv->data, "FAIL" CRLF);
             }
         }
+        is_error = rcv->data[0] == '+' && !strncmp(rcv->data, "+CME ERROR", 10);/* First check +CME coded errors */
+        LWGSM_DEBUGW(LWGSM_CFG_DBG_INPUT | LWGSM_DBG_LVL_DANGER | LWGSM_DBG_TYPE_TRACE,
+                    is_error, "%s\r\n", rcv->data);
     }
 
     /* Scan received strings which start with '+' */
@@ -808,11 +810,14 @@ lwgsmi_parse_received(lwgsm_recv_t* rcv) {
             lwgsmi_parse_caopen(rcv->data, rcv->len, &is_error);        /* Parse +CAOPEN statement */
         } else if(!strncmp(rcv->data, "+CASTATE", 8)){
             lwgsmi_parse_castate(rcv->data, rcv->len);                  /* Parse +CASTATE statement */
+        } else if(CMD_IS_CUR(LWGSM_CMD_CARECV) && !strncmp(rcv->data, "+CARECV", 7)){
+            lwgsmi_parse_carecv(rcv->data, rcv->len);
         } else if(!strncmp(rcv->data, "+CAURC", 6)){
-            lwgsmi_parse_ipd(rcv->data);                      /* Parse +CAURC statement */
+            lwgsmi_parse_ipd(rcv->data);                                /* Parse +CAURC statement */
+        } else if(!strncmp(rcv->data, "+CADATAIND", 10)){
+            lwgsmi_parse_dataind(rcv->data);
 #endif
         }
-
         /* Messages not starting with '+' sign */
     } else {
         if (rcv->data[0] == 'S' && !strncmp(rcv->data, "SHUT OK" CRLF, 7 + CRLF_LEN)) {
@@ -1262,10 +1267,10 @@ lwgsmi_process(const void* data, size_t data_len) {
                 lwgsmi_parse_received(&recv_buff);
             }
 #endif /* LWGSM_CFG_USSD */
-            /*
-             * We are in command mode where we have to process byte by byte
-             * Simply check for ASCII and unicode format and process data accordingly
-             */
+        /*
+        * We are in command mode where we have to process byte by byte
+        * Simply check for ASCII and unicode format and process data accordingly
+        */
         } else {
             lwgsmr_t res = lwgsmERR;
             if (LWGSM_ISVALIDASCII(ch)) {       /* Manually check if valid ASCII character */
@@ -1291,10 +1296,15 @@ lwgsmi_process(const void* data, size_t data_len) {
                             RECV_ADD(ch);       /* Any ASCII valid character */
                             break;
                     }
-
-#if LWGSM_CFG_CONN
+#if LWGSM_CFG_CONN                 
+                    if(CMD_IS_CUR(LWGSM_CMD_CARECV) && !lwgsm.msg->msg.conn_recv.read){
+                        if(lwgsmi_parse_carecv(recv_buff.data, recv_buff.len)){
+                            RECV_RESET();
+                            lwgsm.msg->msg.conn_recv.read = 1;
+                        }
+                    }
                     /* Check if we have to read data */
-                    if (ch == '\n' && lwgsm.m.ipd.read) {
+                    if ((ch == '\n' || CMD_IS_CUR(LWGSM_CMD_CARECV)) && lwgsm.m.ipd.read) {
                         size_t len;
                         LWGSM_DEBUGF(LWGSM_CFG_DBG_IPD | LWGSM_DBG_TYPE_TRACE,
                                    "[IPD] Data on connection %d with total size %d byte(s)\r\n",
@@ -1422,7 +1432,7 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 break;                          
             case LWGSM_CMD_CGNSPWR_OFF:         /* Power off GNSS */
                 SET_NEW_CMD(LWGSM_CMD_CFUN_SET);
-                break;
+                break;                          
             case LWGSM_CMD_CFUN_SET:             /* Set full functionality */
                 SET_NEW_CMD(LWGSM_CMD_CMEE_SET);
                 break;
@@ -1855,6 +1865,7 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                         lwgsm.evt.evt.conn_active_close.forced = 1;
                         lwgsmi_send_conn_cb(conn, NULL);
                         lwgsmi_conn_start_timeout(conn);/* Start connection timeout timer */
+                        SET_NEW_CMD_CHECK_ERROR(LWGSM_CMD_CASRIP_SET);  /* Show IP and port at CARECV message */
                         break;
                     }
                     case LWGSM_CONN_CONNECT_ERROR: {/* Connection error */
@@ -2590,6 +2601,13 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_END_AT();
             break;
         }
+        case LWGSM_CMD_CASRIP_SET:{             /* Show the remote IP and port when print the received data */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CASRIP=");
+            lwgsmi_send_number(1, 0, 0);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
         /* File System commands */
         case LWGSM_CMD_CFSINIT:{                /* Get Flash Data Buffer */
             AT_PORT_SEND_BEGIN_AT();
@@ -2720,15 +2738,31 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             }
             lwgsmi_send_string(msg->msg.conn_start.host, 0, 1 ,1);
             lwgsmi_send_number(LWGSM_U32(msg->msg.conn_start.port), 0, 1);
+            #if !LWGSM_SIM7080_TCP_RECV_MANUAL
             lwgsmi_send_number(1, 0, 1);
+            #else
+            lwgsmi_send_number(0, 0, 1);
+            #endif /* !LWGSM_SIM7080_TCP_RECV_MANUAL */
+            lwgsm.m.conns[LWGSM_U32((*msg->msg.conn_start.conn)->num)].remote_port = msg->msg.conn_start.port;
+            lwgsm.m.conns[LWGSM_U32((*msg->msg.conn_start.conn)->num)].remote_host = lwgsm_mem_calloc(strlen(msg->msg.conn_start.host)+1, sizeof(char));
+            strcpy(lwgsm.m.conns[LWGSM_U32((*msg->msg.conn_start.conn)->num)].remote_host, msg->msg.conn_start.host);
             AT_PORT_SEND_END_AT();
             break;
         }
         case LWGSM_CMD_CASEND: {                /* Send data to connection */
             return lwgsmi_tcpip_process_send_data();/* Process send data */
         }
+        case LWGSM_CMD_CARECV: {
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CARECV=");
+            lwgsmi_send_number(LWGSM_U32(msg->msg.conn_recv.conn ? msg->msg.conn_recv.conn->num : LWGSM_CFG_MAX_CONNS), 0, 0);
+            lwgsmi_send_number(msg->msg.conn_recv.len, 0, 1);
+            AT_PORT_SEND_END_AT();
+            break;
+        }
         case LWGSM_CMD_CACLOSE: {               /* Close the connection */
             lwgsm_conn_p c = msg->msg.conn_close.conn;
+            if(c->remote_host != NULL){ lwgsm_mem_free(c->remote_host); }
             if (c != NULL &&
                 /* Is connection already closed or command for this connection is not valid anymore? */
                 (!lwgsm_conn_is_active(c) || c->val_id != msg->msg.conn_close.val_id)) {

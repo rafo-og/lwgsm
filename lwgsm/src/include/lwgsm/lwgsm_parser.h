@@ -73,6 +73,8 @@ uint8_t     lwgsmi_parse_cgnapn(const char* str, uint8_t len);
 uint8_t     lwgsmi_parse_cdnsgip(const char* str, uint8_t len, uint8_t* is_ok, uint16_t* is_error, lwgsm_ip_t*  ip);
 uint8_t     lwgsmi_parse_caopen(const char* str, uint8_t len, uint16_t* is_error);
 uint8_t     lwgsmi_parse_castate(const char* str, uint8_t len);
+uint8_t     lwgsmi_parse_carecv(const char* str, uint8_t len);
+uint8_t     lwgsmi_parse_dataind(const char* str);
 #endif
 
 uint8_t     lwgsmi_parse_ipd(const char* str);

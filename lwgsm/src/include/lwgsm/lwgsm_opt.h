@@ -661,7 +661,11 @@ void *  my_memset(void* dst, int b, size_t len);
  * \}
  */
 
-#ifdef  LWGSM_SIM7080
+#ifndef LWGSM_SIM7080
+#define LWGSM_SIM7080   0
+#endif
+
+#if  LWGSM_SIM7080
 
 /**
  * \brief       Network types to set preferred network
@@ -670,11 +674,17 @@ void *  my_memset(void* dst, int b, size_t len);
 #define LWGSM_NET_TYPE_CAT_M    1
 #endif
 #ifndef LWGSM_NET_TYPE_NB_IOT
-#define LWGSM_NET_TYPE_NB_IOT    2
+#define LWGSM_NET_TYPE_NB_IOT   2
 #endif
 #ifndef LWGSM_NET_TYPE_BOTH
 #define LWGSM_NET_TYPE_BOTH    3
 #endif
+#ifndef LWGSM_SIM7080_TCP_RECV_MANUAL
+#define LWGSM_SIM7080_TCP_RECV_MANUAL    0
+#endif 
+#ifndef LWGSM_SIM7080_TCP_RECV_LENGTH_MAX
+#define LWGSM_SIM7080_TCP_RECV_LENGTH_MAX    1460
+#endif 
 
 /**
  * \brief           Set debug level for memory manager

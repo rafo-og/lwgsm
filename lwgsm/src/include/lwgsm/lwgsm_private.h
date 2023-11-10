@@ -261,6 +261,7 @@ typedef enum {
     LWGSM_CMD_CNACT_SET_1,                      /*!< PDP configure */
     LWGSM_CMD_CMNB_SET,                         /*!< Set preferred network type */
     LWGSM_CMD_CGDCONT,                          /*!< Define PDP Context */
+    LWGSM_CMD_CASRIP_SET,                       /*!< Show the remote IP and port when print the received data */
     /* File System AT commands */
     LWGSM_CMD_CFSINIT,                          /*!< Get Flash Data Buffer */
     LWGSM_CMD_CFSWFILE,                         /*!< Write File to the Flash Buffer Allocated by CFSINIT */
@@ -280,6 +281,7 @@ typedef enum {
     LWGSM_CMD_CAOPEN,                           /*!< Open a TCP/UDP Connection */
     LWGSM_CMD_CACLOSE,                          /*!< Close a TCP/UDP Connection */
     LWGSM_CMD_CASEND,                           /*!< Send Data via an Established Connection */
+    LWGSM_CMD_CARECV,                           /*!< Receive Data via an Established Connection */
     /* GNSS AT commands */
     LWGSM_CMD_CGNSPWR_OFF,                      /*!< GNSS Power Off */
     /* AT COMMANDS SEQUENCES */
@@ -297,6 +299,7 @@ typedef enum {
 typedef struct lwgsm_conn {
     lwgsm_conn_type_t type;                     /*!< Connection type */
     uint8_t         num;                        /*!< Connection number */
+    char*             remote_host;              /*!< Remote hostname */
     lwgsm_ip_t        remote_ip;                /*!< Remote IP address */
     lwgsm_port_t      remote_port;              /*!< Remote port number */
     lwgsm_port_t      local_port;               /*!< Local IP address */
@@ -311,6 +314,8 @@ typedef struct lwgsm_conn {
 
     size_t          total_recved;               /*!< Total number of bytes received */
 
+    size_t          last_recved;                /*!< Last number of bytes received */
+
     union {
         struct {
             uint8_t active: 1;                  /*!< Status whether connection is active */
@@ -319,6 +324,8 @@ typedef struct lwgsm_conn {
             uint8_t in_closing: 1;               /*!< Status if connection is in closing mode.
                                                     When in closing mode, ignore any possible received data from function */
             uint8_t bearer: 1;                  /*!< Bearer used. Can be `1` or `0` */
+            uint8_t data_available: 1;          /* !< There is data available in module buffer */
+            uint8_t full: 1;                    /* !< The module buffer is full */
         } f;                                    /*!< Connection flags */
     } status;                                   /*!< Connection status union with flag bits */
 } lwgsm_conn_t;
@@ -476,6 +483,13 @@ typedef struct lwgsm_msg {
             size_t* bw;                         /*!< Number of bytes written so far */
             uint8_t val_id;                     /*!< Connection current validation ID when command was sent to queue */
         } conn_send;                            /*!< Structure to send data on connection */
+#if LWGSM_SIM7080
+        struct{
+            lwgsm_conn_t* conn;
+            size_t len;
+            uint8_t read;
+        } conn_recv;
+#endif
 #endif /* LWGSM_CFG_CONN || __DOXYGEN__ */
 #if LWGSM_CFG_SMS || __DOXYGEN__
         struct {
