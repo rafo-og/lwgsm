@@ -328,6 +328,23 @@ lwgsm_conn_send(lwgsm_conn_p conn, const void* data, size_t btw, size_t* const b
     return res;
 }
 
+#if LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL
+lwgsmr_t lwgsm_conn_recv(lwgsm_conn_p conn, size_t len, const uint32_t blocking){
+    LWGSM_ASSERT("conn != NULL", conn != NULL);
+    
+    LWGSM_MSG_VAR_DEFINE(msg);
+    LWGSM_MSG_VAR_ALLOC(msg, blocking);
+
+    LWGSM_MSG_VAR_REF(msg).cmd_def = LWGSM_CMD_CARECV;
+
+    LWGSM_MSG_VAR_REF(msg).msg.conn_recv.conn = conn;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_recv.len = len;
+    LWGSM_MSG_VAR_REF(msg).msg.conn_recv.read = 0;
+
+    return lwgsmi_send_msg_to_producer_mbox(&LWGSM_MSG_VAR_REF(msg), lwgsmi_initiate_cmd, 60000);
+}
+#endif /* LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL */
+
 /**
  * \brief           Notify connection about received data which means connection is ready to accept more data
  *

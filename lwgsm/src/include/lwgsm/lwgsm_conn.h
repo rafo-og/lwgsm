@@ -50,6 +50,9 @@ extern "C" {
 lwgsmr_t      lwgsm_conn_start(lwgsm_conn_p* conn, lwgsm_conn_type_t type, const char* const host, lwgsm_port_t port, void* const arg, lwgsm_evt_fn conn_evt_fn, const uint32_t blocking);
 lwgsmr_t      lwgsm_conn_close(lwgsm_conn_p conn, const uint32_t blocking);
 lwgsmr_t      lwgsm_conn_send(lwgsm_conn_p conn, const void* data, size_t btw, size_t* const bw, const uint32_t blocking);
+#if LWGSM_SIM7080 || LWGSM_SIM7080_TCP_RECV_MANUAL
+lwgsmr_t      lwgsm_conn_recv(lwgsm_conn_p conn, size_t len, const uint32_t blocking);
+#endif /* LWGSM_SIM7080 && LWGSM_SIM7080_TCP_RECV_MANUAL */
 lwgsmr_t      lwgsm_conn_sendto(lwgsm_conn_p conn, const lwgsm_ip_t* const ip, lwgsm_port_t port, const void* data, size_t btw, size_t* bw, const uint32_t blocking);
 lwgsmr_t      lwgsm_conn_set_arg(lwgsm_conn_p conn, void* const arg);
 void*       lwgsm_conn_get_arg(lwgsm_conn_p conn);
