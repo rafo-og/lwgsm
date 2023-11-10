@@ -55,7 +55,7 @@ extern "C" {
  */
 #define LWGSM_ASSERT(msg, c)   do {   \
         if (!(c)) {                     \
-            LWGSM_DEBUGF(LWGSM_CFG_DBG_ASSERT, "Wrong parameters on file %s and line %d: %s\r\n", __FILE__, (int)__LINE__, msg);\
+            LWGSM_DEBUGF(LWGSM_CFG_DBG_ASSERT | LWGSM_DBG_LVL_WARNING | LWGSM_DBG_TYPE_TRACE, "Wrong parameters on file %s and line %d: %s\r\n", __FILE__, (int)__LINE__, msg);\
             return lwgsmPARERR;           \
         }                               \
     } while (0)
