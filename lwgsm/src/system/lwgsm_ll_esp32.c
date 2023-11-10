@@ -145,7 +145,7 @@ static void usart_ll_thread(void* arg)
                 be full.*/
                 case UART_DATA:
                     uart_get_buffered_data_len(LWGSM_UART_NUM, (size_t*)&buffered_data_len);
-                    if(buffered_data_len > 0){
+                    if(buffered_data_len > 0 && buffered_data_len < 8191){  /* Limit the maximum packet length */
                         dataBlock.packet = pvPortMalloc(buffered_data_len);
                         dataBlock.packetLength = buffered_data_len;
                         dataBlock.packetLength = uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, 20/portTICK_RATE_MS);
@@ -186,13 +186,13 @@ static void process_data_thread(void* arg)
     while(lwgsm.status.f.runningLLThread){
         if(xQueueReceive(data_to_process_queue_id, &dataBlock, 
                     LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS) == pdPASS){
-            #if LWGSM_CFG_DBG_LL_RECV
+            #if LWGSM_CFG_DBG_LL_RECV && LWGSM_CFG_DBG
             printf("[DATA EVT]:");
             for(int i=0; i<dataBlock.packetLength; i++){
                 printf("%c", *(dataBlock.packet + i));
             }
             printf("\r\n");
-            #endif /* LWGSM_CFG_DBG_LL_RECV */   
+            #endif /* LWGSM_CFG_DBG_LL_RECV && LWGSM_CFG_DBG */   
             lwgsm_input_process(dataBlock.packet, dataBlock.packetLength);
             vPortFree(dataBlock.packet);
         }
@@ -290,7 +290,7 @@ static size_t send_data(const void* data, size_t len)
  {
     int sent = 0;
 
-#if LWGSM_CFG_DBG_LL_SEND
+#if LWGSM_CFG_DBG_LL_SEND && LWGSM_CFG_DBG
     int i = 0;
     if(len > 0){
         printf("=> (%d bytes):", len);
@@ -300,7 +300,7 @@ static size_t send_data(const void* data, size_t len)
         }
         printf("\r\n");
     }
-#endif /* LWGSM_CFG_DBG_LL_SEND */
+#endif /* LWGSM_CFG_DBG_LL_SEND && LWGSM_CFG_DBG */
 
     if(len > 0){
         sent = uart_write_bytes(LWGSM_UART_NUM, (const char*) data, len);
