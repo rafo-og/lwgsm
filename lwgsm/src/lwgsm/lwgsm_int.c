@@ -1942,13 +1942,6 @@ lwgsmr_t
 lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
     switch (CMD_GET_CUR()) {                    /* Check current message we want to send over AT */
         case LWGSM_CMD_RESET: {                 /* Reset modem with AT commands */
-            // /* Try with hardware reset */
-            // if (lwgsm.ll.reset_fn != NULL && lwgsm.ll.reset_fn(1)) {
-            //     lwgsm_delay(1000);
-            //     lwgsm.ll.reset_fn(0);
-            //     lwgsm_delay(1000);
-            // }
-
             /* Send manual AT command */
             AT_PORT_SEND_BEGIN_AT();
             AT_PORT_SEND_CONST_STR("+CFUN=1,1");

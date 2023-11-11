@@ -455,6 +455,22 @@ lwgsm_conn_is_active(lwgsm_conn_p conn) {
 }
 
 /**
+ * \brief           Check if connection is active and connected
+ * \param[in]       conn: Pointer to connection to check for status
+ * \return          `1` on success, `0` otherwise
+ */
+uint8_t
+lwgsm_conn_is_connected(lwgsm_conn_p conn) {
+    uint8_t res = 0;
+    if (conn != NULL && lwgsmi_is_valid_conn_ptr(conn)) {
+        lwgsm_core_lock();
+        res = conn->status.f.active && !conn->status.f.remote_closed;
+        lwgsm_core_unlock();
+    }
+    return res;
+}
+
+/**
  * \brief           Check if connection is closed
  * \param[in]       conn: Pointer to connection to check for status
  * \return          `1` on success, `0` otherwise

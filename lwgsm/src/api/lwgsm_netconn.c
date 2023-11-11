@@ -660,7 +660,7 @@ lwgsm_netconn_connect_async(lwgsm_netconn_p nc, const char* host, lwgsm_port_t p
 
 uint8_t
 lwgsm_netconn_is_connected(lwgsm_netconn_p nc){
-    return lwgsm_conn_is_active(nc->conn);
+    return lwgsm_conn_is_connected(nc->conn);
 }
 
 #endif

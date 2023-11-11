@@ -323,6 +323,7 @@ typedef struct lwgsm_conn {
             uint8_t data_received: 1;           /*!< Status whether first data were received on connection */
             uint8_t in_closing: 1;               /*!< Status if connection is in closing mode.
                                                     When in closing mode, ignore any possible received data from function */
+            uint8_t remote_closed: 1;           /*!< Connection closed by GSM module */
             uint8_t bearer: 1;                  /*!< Bearer used. Can be `1` or `0` */
             uint8_t data_available: 1;          /* !< There is data available in module buffer */
             uint8_t full: 1;                    /* !< The module buffer is full */

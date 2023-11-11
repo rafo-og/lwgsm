@@ -58,6 +58,7 @@ lwgsmr_t      lwgsm_conn_set_arg(lwgsm_conn_p conn, void* const arg);
 void*       lwgsm_conn_get_arg(lwgsm_conn_p conn);
 uint8_t     lwgsm_conn_is_client(lwgsm_conn_p conn);
 uint8_t     lwgsm_conn_is_active(lwgsm_conn_p conn);
+uint8_t     lwgsm_conn_is_connected(lwgsm_conn_p conn);
 uint8_t     lwgsm_conn_is_closed(lwgsm_conn_p conn);
 int8_t      lwgsm_conn_getnum(lwgsm_conn_p conn);
 lwgsmr_t      lwgsm_get_conns_status(const uint32_t blocking);

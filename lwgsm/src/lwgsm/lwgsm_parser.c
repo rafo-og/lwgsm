@@ -1218,7 +1218,11 @@ lwgsmi_parse_castate(const char* str, uint8_t len)
     
         if(conn_state == 0){
             if (conn->status.f.active) {            /* Check if connection is not */
+            #if LWGSM_SIM7080
+                conn->status.f.remote_closed = 1;
+            #else
                 lwgsmi_conn_closed_process(conn->num, 0);   /* Process closed event */
+            #endif /* LWGSM_SIM7080 */
             }
         }
     }
