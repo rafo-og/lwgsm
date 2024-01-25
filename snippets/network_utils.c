@@ -103,7 +103,7 @@ network_utils_process_rssi(lwgsm_evt_t* evt, char** out) {
     rssi = lwgsm_evt_signal_strength_get_rssi(evt);
 
     /* Write the report in memory */
-    report_len = snprintf(NULL, 0, "Network operator RSSI: %d dBm", (int)rssi);
+    report_len = snprintf(NULL, 0, "Network operator RSSI: %d dBm\r\n", (int)rssi);
     *out = lwgsm_mem_calloc(report_len, sizeof(char));
-    snprintf(*out, ++report_len, "Network operator RSSI: %d dBm\r\n", (int)rssi);
+    snprintf(*out, report_len, "Network operator RSSI: %d dBm\r\n", (int)rssi);
 }
