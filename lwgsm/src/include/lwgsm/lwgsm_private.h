@@ -55,6 +55,7 @@ typedef enum {
 
     /* Basic AT commands */
     LWGSM_CMD_RESET,                            /*!< Reset device */
+    LWGSM_CMD_CONFIG,                           /*!< Configure the module, usually after reset */
     LWGSM_CMD_RESET_DEVICE_FIRST_CMD,           /*!< Reset device first driver specific command */
     LWGSM_CMD_ATE0,                             /*!< Disable ECHO mode on AT commands */
     LWGSM_CMD_ATE1,                             /*!< Enable ECHO mode on AT commands */

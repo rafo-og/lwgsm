@@ -1422,20 +1422,25 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
         switch (CMD_GET_CUR()) {                /* Check current command */
             case LWGSM_CMD_RESET: {
                 lwgsmi_reset_everything(1);     /* Reset everything */
-                SET_NEW_CMD(LWGSM_CFG_AT_ECHO ? LWGSM_CMD_ATE1 : LWGSM_CMD_ATE0);   /* Set ECHO mode */
                 lwgsm_delay(LWGSM_CFG_WAIT_AFTER_RESET);        /* Delay for some time before we can continue after reset */
                 break;
             }
+            default:
+                break;
+        }
+        /* Send event */
+        if (n_cmd == LWGSM_CMD_IDLE) {
+            RESET_SEND_EVT(msg, lwgsmOK);
+        }
+    } else if (CMD_IS_DEF(LWGSM_CMD_CONFIG)) {
+        switch (CMD_GET_CUR()) {                /* Check current command */
             case LWGSM_CMD_ATE0:
             case LWGSM_CMD_ATE1:
                 SET_NEW_CMD(LWGSM_CMD_CGNSPWR_OFF);
                 break;                          
             case LWGSM_CMD_CGNSPWR_OFF:         /* Power off GNSS */
-                SET_NEW_CMD(LWGSM_CMD_CFUN_SET);
-                break;                          
-            case LWGSM_CMD_CFUN_SET:             /* Set full functionality */
                 SET_NEW_CMD(LWGSM_CMD_CMEE_SET);
-                break;
+                break;                          
             case LWGSM_CMD_CMEE_SET:            /* Set detailed error reporting */
                 SET_NEW_CMD(LWGSM_CMD_CGMI_GET);
                 break;                          /* Get manufacturer */
@@ -1474,11 +1479,6 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 break;
             default:
                 break;
-        }
-
-        /* Send event */
-        if (n_cmd == LWGSM_CMD_IDLE) {
-            RESET_SEND_EVT(msg, lwgsmOK);
         }
     } else if (CMD_IS_DEF(LWGSM_CMD_COPS_GET)) {
         if (CMD_IS_CUR(LWGSM_CMD_COPS_GET)) {
