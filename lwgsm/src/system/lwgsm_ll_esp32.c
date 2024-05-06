@@ -90,6 +90,8 @@
 #define USART_THREAD_PRIORITY       ( tskIDLE_PRIORITY + 5 )
 #define USART_QUEUE_TIMEOUT         (portTickType) 5000/portTICK_PERIOD_MS
 
+#define USART_MAX_PACKET_SIZE       2048
+
 #if !defined(LWGSM_READING_THREAD_STACK_SIZE)
 #define LWGSM_READING_THREAD_STACK_SIZE         4096
 #endif /*LWGSM_READING_THREAD_STACK_SIZE*/
@@ -146,10 +148,11 @@ static void usart_ll_thread(void* arg)
                 case UART_DATA:
                     uart_get_buffered_data_len(LWGSM_UART_NUM, (size_t*)&buffered_data_len);
                     if(buffered_data_len > 0 && buffered_data_len < 8191){  /* Limit the maximum packet length */
+                        buffered_data_len = buffered_data_len > USART_MAX_PACKET_SIZE ? buffered_data_len : USART_MAX_PACKET_SIZE;
                         dataBlock.packet = pvPortMalloc(buffered_data_len);
                         dataBlock.packetLength = buffered_data_len;
-                        dataBlock.packetLength = uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, 20/portTICK_RATE_MS);
-                        xQueueSend(data_to_process_queue_id, &dataBlock, LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS);
+                        dataBlock.packetLength = uart_read_bytes(LWGSM_UART_NUM, dataBlock.packet, dataBlock.packetLength, 10/portTICK_RATE_MS);
+                        xQueueSend(data_to_process_queue_id, &dataBlock, 0);
                     }
                     break;
                 case UART_BREAK:
@@ -187,11 +190,14 @@ static void process_data_thread(void* arg)
         if(xQueueReceive(data_to_process_queue_id, &dataBlock, 
                     LWGSM_PROCESS_QUEUE_TIMEOUT_MS/portTICK_PERIOD_MS) == pdPASS){
             #if LWGSM_CFG_DBG_LL_RECV && LWGSM_CFG_DBG
-            printf("[DATA EVT]:");
-            for(int i=0; i<dataBlock.packetLength; i++){
-                printf("%c", *(dataBlock.packet + i));
-            }
-            printf("\r\n");
+            // printf("[DATA EVT]:");
+            // for(int i=0; i<dataBlock.packetLength; i++){
+            //     printf("%c", *(dataBlock.packet + i));
+            // }
+            // printf("\r\n");
+            ESP_LOGD(TAG, "[DATA EVT]: %d", dataBlock.packetLength);
+            // ESP_LOG_BUFFER_CHAR(TAG, dataBlock.packet, dataBlock.packetLength); 
+            //vTaskDelay(100 / portTICK_PERIOD_MS);
             #endif /* LWGSM_CFG_DBG_LL_RECV && LWGSM_CFG_DBG */   
             lwgsm_input_process(dataBlock.packet, dataBlock.packetLength);
             vPortFree(dataBlock.packet);

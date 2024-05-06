@@ -679,6 +679,18 @@ void *  my_memset(void* dst, int b, size_t len);
 #ifndef LWGSM_NET_TYPE_BOTH
 #define LWGSM_NET_TYPE_BOTH    3
 #endif
+#ifndef LWGSM_MODE_SELECTION_AUTO
+#define LWGSM_MODE_SELECTION_AUTO   2
+#endif
+#ifndef LWGSM_MODE_SELECTION_GSM
+#define LWGSM_MODE_SELECTION_GSM     13
+#endif
+#ifndef LWGSM_MODE_SELECTION_LTE
+#define LWGSM_MODE_SELECTION_LTE     38
+#endif
+#ifndef LWGSM_MODE_SELECTION_GSM_LTE
+#define LWGSM_MODE_SELECTION_GSM_LTE 51
+#endif
 #ifndef LWGSM_SIM7080_TCP_RECV_MANUAL
 #define LWGSM_SIM7080_TCP_RECV_MANUAL    0
 #endif 

@@ -261,6 +261,7 @@ typedef enum {
     LWGSM_CMD_CNACT_SET_0,                      /*!< PDP configure */
     LWGSM_CMD_CNACT_SET_1,                      /*!< PDP configure */
     LWGSM_CMD_CMNB_SET,                         /*!< Set preferred network type */
+    LWGSM_CMD_CNMP_SET,                         /*!< Set preferred mode, GSM, LTE */
     LWGSM_CMD_CGDCONT,                          /*!< Define PDP Context */
     LWGSM_CMD_CASRIP_SET,                       /*!< Show the remote IP and port when print the received data */
     /* File System AT commands */

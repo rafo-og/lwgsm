@@ -1473,9 +1473,14 @@ lwgsmi_process_sub_cmd(lwgsm_msg_t* msg, uint8_t* is_ok, uint16_t* is_error) {
                 SET_NEW_CMD(LWGSM_CMD_CPIN_GET);
                 break;                          /* Get SIM state */
             case LWGSM_CMD_CPIN_GET:
-                SET_NEW_CMD(LWGSM_CMD_CMNB_SET);
-                break;                          /* Set preferred option between NB-IoT and CAT-M */
+                SET_NEW_CMD(LWGSM_CMD_CMNB_SET); /* Set preferred option between NB-IoT and CAT-M */
+                //SET_NEW_CMD(LWGSM_CMD_CNMP_SET);
+                break;                          /* Set preferred mode selection*/
             case LWGSM_CMD_CMNB_SET:
+                //SET_NEW_CMD(LWGSM_CMD_CMNB_SET); /* Set preferred option between NB-IoT and CAT-M */
+                break;                          
+            case LWGSM_CMD_CNMP_SET:
+                //SET_NEW_CMD(LWGSM_CMD_CMNB_SET); /* Set preferred option between NB-IoT and CAT-M */
                 break;
             default:
                 break;
@@ -2540,6 +2545,21 @@ lwgsmi_initiate_cmd(lwgsm_msg_t* msg) {
             AT_PORT_SEND_CHR("2");
 #else
             AT_PORT_SEND_CONST_STR("3");
+#endif
+            AT_PORT_SEND_END_AT();
+            break;
+        }
+        case LWGSM_CMD_CNMP_SET:{               /* Set preferred mode selection */
+            AT_PORT_SEND_BEGIN_AT();
+            AT_PORT_SEND_CONST_STR("+CNMP=");
+#if LWGSM_PREFERRED_MODE_SELECTION == LWGSM_MODE_SELECTION_GSM
+            AT_PORT_SEND_CHR("13");
+#elif LWGSM_PREFERRED_MODE_SELECTION == LWGSM_MODE_SELECTION_LTE
+            AT_PORT_SEND_CHR("38");
+#elif LWGSM_PREFERRED_MODE_SELECTION == LWGSM_MODE_SELECTION_GSM_LTE
+            AT_PORT_SEND_CHR("51");
+#else
+            AT_PORT_SEND_CHR("2"); // AUTO
 #endif
             AT_PORT_SEND_END_AT();
             break;
