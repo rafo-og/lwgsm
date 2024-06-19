@@ -56,6 +56,12 @@ def_callback(lwgsm_evt_t* evt) {
     return lwgsmOK;
 }
 
+lwgsmr_t lwgsm_device_get_cached_revision(char ** rev){
+    *rev = lwgsm.m.model_revision;
+    LWGSM_UNUSED(rev);
+    return lwgsmOK;
+}
+
 /**
  * \brief           Init and prepare GSM stack for device operation
  * \note            Function must be called from operating system thread context.
